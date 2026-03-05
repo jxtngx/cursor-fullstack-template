@@ -24,7 +24,3 @@ Enable the fullstack development with AI for AI.
 - AWS for Cloud Services
 - LocalStack for AWS emulation
 - SigNoz and Phoenix for Monitoring and Observability
-
-## Portability
-
-This concept can be ported to additional language combinations and use cases, such as a Swift or Kotlin frontend targeting ROS or ZephyrRTOS services over a local network.
