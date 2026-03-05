@@ -24,3 +24,44 @@ Enable the fullstack development with AI for AI.
 - AWS for Cloud Services
 - LocalStack for AWS emulation
 - SigNoz and Phoenix for Monitoring and Observability
+
+## Required Accounts & Services
+
+Based on the opinionated technology choices, you'll need accounts for the following services:
+
+### Core Development
+
+| Service | Purpose | Free Tier | Required |
+|---------|---------|-----------|----------|
+| [GitHub](https://github.com) | Code hosting, version control, CI/CD | ✅ Yes | ✅ Required |
+| [Docker Hub](https://hub.docker.com) | Container registry | ✅ Yes (public) | ✅ Required |
+
+### Cloud & Infrastructure
+
+| Service | Purpose | Free Tier | Required |
+|---------|---------|-----------|----------|
+| [AWS](https://aws.amazon.com) | Cloud services (Bedrock, S3, RDS, etc.) | ✅ Yes (12 months) | ✅ Required for production |
+
+### AI & ML Services
+
+| Service | Purpose | Free Tier | Required |
+|---------|---------|-----------|----------|
+| [AWS Bedrock](https://aws.amazon.com/bedrock/) | Fine-tuned model hosting | ❌ Pay per use | ✅ Required for AI features |
+| [AWS EC2](https://aws.amazon.com/ec2/) | Model training and tuning | ❌ Pay per use | ✅ Required for AI development |
+| [HuggingFace](https://huggingface.co) | Model hub, datasets, inference | ✅ Yes | ✅ Required |
+| [LangChain](https://www.langchain.com) | Agent framework (open source) | ✅ Yes | ✅ Required |
+
+### Work Tracking & Communication (MCP Integrations)
+
+| Service | Purpose | Free Tier | Required |
+|---------|---------|-----------|----------|
+| [Notion](https://www.notion.so) | Documentation, sprint planning, knowledge base | ✅ Yes (personal) | ✅ Recommended |
+| [Linear](https://linear.app) | Issue tracking, project management | ✅ Yes (up to 10 users) | ✅ Recommended |
+| [Discord](https://discord.com) | Team communication, bot notifications | ✅ Yes | ✅ Recommended |
+
+### Development Tools
+
+| Service | Purpose | Free Tier | Required |
+|---------|---------|-----------|----------|
+| [Cursor](https://cursor.sh) | AI-powered IDE | ✅ Yes | ✅ Required |
+| [GitHub Copilot](https://github.com/features/copilot) | AI code completion | ✅ Yes | ⚪ Optional |
