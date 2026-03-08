@@ -1,0 +1,470 @@
+# Product Discovery Command
+
+Guide users through structured product idea formation using conditional questionnaires.
+
+## Implementation Steps
+
+### 1. Initialize Session
+
+Read README.md to load opinionated technology stack defaults:
+- Python + TypeScript
+- Next.js + Shadcn UI
+- FastAPI
+- PostgreSQL or Cassandra
+- HuggingFace + LangChain
+- Docker + Make
+- AWS + LocalStack
+- SigNoz + Phoenix
+- MCP Integrations (Notion, Linear, Discord)
+
+### 2. Question Sequence
+
+#### Q1: Technology Stack Decision
+
+Use AskQuestion tool:
+
+```json
+{
+  "title": "Product Discovery - Technology Stack",
+  "questions": [
+    {
+      "id": "use-defaults",
+      "prompt": "This template uses an opinionated tech stack: Python/TypeScript, Next.js, FastAPI, AWS, HuggingFace, LangChain, Docker, SigNoz. Would you like to use these defaults?",
+      "options": [
+        {"id": "yes-defaults", "label": "Yes - Use template defaults (recommended for faster setup)"},
+        {"id": "customize", "label": "No - I want to customize the technology stack"}
+      ],
+      "allow_multiple": false
+    }
+  ]
+}
+```
+
+Store response as `uses_template_defaults`.
+
+#### Q2: Customization (Conditional)
+
+If user selected "customize", ask:
+
+```json
+{
+  "title": "Technology Stack Customization",
+  "questions": [
+    {
+      "id": "frontend",
+      "prompt": "Frontend Framework?",
+      "options": [
+        {"id": "nextjs", "label": "Next.js (default)"},
+        {"id": "react", "label": "React (vanilla)"},
+        {"id": "vue", "label": "Vue.js"},
+        {"id": "other-frontend", "label": "Other"}
+      ],
+      "allow_multiple": false
+    },
+    {
+      "id": "backend",
+      "prompt": "Backend Framework?",
+      "options": [
+        {"id": "fastapi", "label": "FastAPI (default)"},
+        {"id": "express", "label": "Express.js"},
+        {"id": "django", "label": "Django"},
+        {"id": "other-backend", "label": "Other"}
+      ],
+      "allow_multiple": false
+    },
+    {
+      "id": "database",
+      "prompt": "Database?",
+      "options": [
+        {"id": "postgresql", "label": "PostgreSQL (default for relational)"},
+        {"id": "cassandra", "label": "Cassandra (default for time-series/high-volume)"},
+        {"id": "mongodb", "label": "MongoDB"},
+        {"id": "other-db", "label": "Other"}
+      ],
+      "allow_multiple": false
+    }
+  ]
+}
+```
+
+#### Q3: Target Users
+
+```json
+{
+  "title": "Product Discovery - Target Users",
+  "questions": [
+    {
+      "id": "target-users",
+      "prompt": "Who are the primary users of this product?",
+      "options": [
+        {"id": "developers", "label": "Individual developers"},
+        {"id": "small-teams", "label": "Small teams (2-10 people)"},
+        {"id": "enterprises", "label": "Enterprise organizations"},
+        {"id": "consumers", "label": "End consumers (B2C)"},
+        {"id": "mixed", "label": "Mixed user base"}
+      ],
+      "allow_multiple": true
+    }
+  ]
+}
+```
+
+#### Q4: Product Name and Overview
+
+Ask user to provide:
+- Product name (text input via conversation)
+- One-sentence product description
+- Problem statement (what problem does it solve?)
+
+#### Q5: Core Features
+
+Ask user to describe 3-5 core features via conversation. For each feature, follow up with priority:
+
+```json
+{
+  "title": "Feature Priority",
+  "questions": [
+    {
+      "id": "feature-1-priority",
+      "prompt": "Priority for [Feature Name]?",
+      "options": [
+        {"id": "must-have", "label": "Must-have (MVP requirement)"},
+        {"id": "nice-to-have", "label": "Nice-to-have (post-MVP)"}
+      ],
+      "allow_multiple": false
+    }
+  ]
+}
+```
+
+Repeat for each feature.
+
+#### Q6: Data Requirements
+
+```json
+{
+  "title": "Data Requirements",
+  "questions": [
+    {
+      "id": "data-needs",
+      "prompt": "What type of data storage do you need?",
+      "options": [
+        {"id": "none", "label": "No database needed (static/serverless)"},
+        {"id": "relational", "label": "Relational data (PostgreSQL recommended)"},
+        {"id": "timeseries", "label": "Time-series or high-volume data (Cassandra recommended)"},
+        {"id": "document", "label": "Document store (MongoDB)"},
+        {"id": "mixed-data", "label": "Multiple database types"}
+      ],
+      "allow_multiple": true
+    }
+  ]
+}
+```
+
+#### Q7: AWS Services
+
+```json
+{
+  "title": "AWS Services Selection",
+  "questions": [
+    {
+      "id": "aws-compute",
+      "prompt": "What compute services do you need?",
+      "options": [
+        {"id": "ec2", "label": "EC2 (virtual machines for model training)"},
+        {"id": "ecs", "label": "ECS (container orchestration)"},
+        {"id": "lambda", "label": "Lambda (serverless functions)"},
+        {"id": "no-compute", "label": "None / local only"}
+      ],
+      "allow_multiple": true
+    },
+    {
+      "id": "aws-storage",
+      "prompt": "What storage services do you need?",
+      "options": [
+        {"id": "s3", "label": "S3 (object storage)"},
+        {"id": "rds", "label": "RDS (managed database)"},
+        {"id": "no-storage", "label": "None / local only"}
+      ],
+      "allow_multiple": true
+    },
+    {
+      "id": "aws-ai",
+      "prompt": "What AI/ML services do you need?",
+      "options": [
+        {"id": "bedrock", "label": "Bedrock (model hosting)"},
+        {"id": "sagemaker", "label": "SageMaker (training/inference)"},
+        {"id": "no-ai", "label": "None / using HuggingFace only"}
+      ],
+      "allow_multiple": true
+    }
+  ]
+}
+```
+
+Note: LocalStack is automatically enabled for local AWS emulation.
+
+#### Q8: External Integrations
+
+```json
+{
+  "title": "External Integrations",
+  "questions": [
+    {
+      "id": "auth-provider",
+      "prompt": "Authentication method?",
+      "options": [
+        {"id": "custom-auth", "label": "Custom authentication (build in-house)"},
+        {"id": "auth0", "label": "Auth0"},
+        {"id": "clerk", "label": "Clerk"},
+        {"id": "cognito", "label": "AWS Cognito"},
+        {"id": "no-auth", "label": "No authentication needed"}
+      ],
+      "allow_multiple": false
+    },
+    {
+      "id": "payment",
+      "prompt": "Payment processing?",
+      "options": [
+        {"id": "stripe", "label": "Stripe"},
+        {"id": "paypal", "label": "PayPal"},
+        {"id": "no-payment", "label": "No payment processing"}
+      ],
+      "allow_multiple": false
+    },
+    {
+      "id": "other-integrations",
+      "prompt": "Other third-party services?",
+      "options": [
+        {"id": "email", "label": "Email service (SendGrid, SES)"},
+        {"id": "sms", "label": "SMS (Twilio)"},
+        {"id": "analytics", "label": "Analytics (Segment, Mixpanel)"},
+        {"id": "none-other", "label": "None"}
+      ],
+      "allow_multiple": true
+    }
+  ]
+}
+```
+
+#### Q9: Scale Requirements
+
+```json
+{
+  "title": "Scale & Performance",
+  "questions": [
+    {
+      "id": "scale",
+      "prompt": "Expected scale at launch?",
+      "options": [
+        {"id": "prototype", "label": "Prototype (< 100 users) - LocalStack + SigNoz"},
+        {"id": "small", "label": "Small scale (100-1K users) - AWS Free Tier"},
+        {"id": "medium", "label": "Medium scale (1K-100K users) - AWS paid"},
+        {"id": "large", "label": "Large scale (100K+ users) - AWS enterprise"}
+      ],
+      "allow_multiple": false
+    },
+    {
+      "id": "performance",
+      "prompt": "Performance requirements?",
+      "options": [
+        {"id": "standard", "label": "Standard (< 1s response time)"},
+        {"id": "fast", "label": "Fast (< 500ms response time)"},
+        {"id": "realtime", "label": "Real-time (< 100ms response time)"}
+      ],
+      "allow_multiple": false
+    }
+  ]
+}
+```
+
+#### Q10: UI/UX Preferences
+
+```json
+{
+  "title": "UI/UX Preferences",
+  "questions": [
+    {
+      "id": "design-style",
+      "prompt": "Design style preference?",
+      "options": [
+        {"id": "minimalist", "label": "Minimalist"},
+        {"id": "dashboard", "label": "Feature-rich dashboard"},
+        {"id": "mobile-first", "label": "Mobile-first"},
+        {"id": "standard", "label": "Standard web app"}
+      ],
+      "allow_multiple": true
+    },
+    {
+      "id": "accessibility",
+      "prompt": "Accessibility requirements?",
+      "options": [
+        {"id": "wcag-aa", "label": "WCAG 2.1 AA compliance"},
+        {"id": "wcag-aaa", "label": "WCAG 2.1 AAA compliance"},
+        {"id": "basic", "label": "Basic accessibility"},
+        {"id": "standard-access", "label": "Standard (no special requirements)"}
+      ],
+      "allow_multiple": false
+    },
+    {
+      "id": "dark-mode",
+      "prompt": "Dark mode support?",
+      "options": [
+        {"id": "yes-dark", "label": "Yes (Shadcn UI supports by default)"},
+        {"id": "no-dark", "label": "No"}
+      ],
+      "allow_multiple": false
+    }
+  ]
+}
+```
+
+#### Q11: MCP Work Tracking
+
+```json
+{
+  "title": "Work Tracking Integration",
+  "questions": [
+    {
+      "id": "mcp-enabled",
+      "prompt": "Enable MCP work tracking integrations (Notion, Linear, Discord)?",
+      "options": [
+        {"id": "yes-mcp", "label": "Yes - Enable all MCP integrations"},
+        {"id": "partial-mcp", "label": "Partial - Enable specific integrations"},
+        {"id": "no-mcp", "label": "No - Manual tracking only"}
+      ],
+      "allow_multiple": false
+    }
+  ]
+}
+```
+
+If "partial-mcp" selected, follow up with:
+
+```json
+{
+  "title": "Select MCP Integrations",
+  "questions": [
+    {
+      "id": "mcp-services",
+      "prompt": "Which integrations to enable?",
+      "options": [
+        {"id": "notion", "label": "Notion (documentation, sprint planning)"},
+        {"id": "linear", "label": "Linear (issue tracking)"},
+        {"id": "discord", "label": "Discord (team communication)"}
+      ],
+      "allow_multiple": true
+    }
+  ]
+}
+```
+
+### 3. Repository Configuration
+
+Ask user for:
+- GitHub repository (format: owner/repo)
+- Sprint plan file name (suggest: `[product-name]-sprint.plan.md`)
+
+Use StrReplace to update `.cursor/scripts/create-github-issue.sh`:
+
+Line 9: `_SPRINT_PLAN=.cursor/plans/project-init/[sprint-plan-name]`
+Line 13: `GITHUB_REPO=[owner]/[repo]`
+
+### 4. Generate Technical Requirements
+
+Create file: `.cursor/plans/project-init/[product-name]-technical-requirements.plan.md`
+
+Use all collected responses to populate:
+- Frontmatter with metadata
+- All content sections
+- Mermaid architecture diagram based on tech stack
+
+### 5. Review with User
+
+Present generated technical requirements document to user for review.
+
+Ask: "Would you like to proceed with these requirements, or would you like to make changes?"
+
+If changes needed, allow iteration on specific sections.
+
+### 6. Handoff to Chief Architect
+
+Once approved, notify Chief Architect:
+
+```
+@chief-architect
+
+I have completed product discovery for [Product Name].
+
+Technical Requirements: .cursor/plans/project-init/[filename].plan.md
+
+Please review and validate:
+1. Technical feasibility
+2. Technology stack compatibility
+3. Architecture patterns
+4. Risk assessment
+
+After validation, please update agent files with project-specific context.
+```
+
+### 7. Handoff to Scrum Master
+
+After Chief Architect validation:
+
+```
+@scrum-master
+
+Technical requirements for [Product Name] have been validated.
+
+Requirements File: .cursor/plans/project-init/[filename].plan.md
+
+Please create sprint plan following sprint-plan-example.plan.md with:
+- Ticket naming: FEAT-###, API-###, UI-###, DB-###, TEST-###, DOC-###, INFRA-###
+- Table format from table-header.md
+- Phases: Week 1 (Foundation), Week 2 (Core), Week 3+ (Features)
+- Todos with ticket IDs
+- Mermaid dependency graphs
+- Review checkpoints
+
+Please switch to Plan mode for sprint planning.
+```
+
+## Conditional Logic
+
+- If `uses_template_defaults` = true → Skip Q2 (customization)
+- If `data-needs` includes databases → Emphasize relevant options
+- If AI features in core features → Highlight Bedrock/SageMaker options
+- If scale = prototype → Recommend LocalStack only
+- If scale = large → Recommend comprehensive AWS services
+
+## Response Storage
+
+Store all responses in session memory with keys:
+- `uses_template_defaults`: boolean
+- `tech_stack`: object with custom choices (if applicable)
+- `target_users`: array
+- `product_name`: string
+- `product_overview`: string
+- `problem_statement`: string
+- `core_features`: array of {name, description, priority}
+- `data_requirements`: array
+- `aws_services`: object {compute, storage, ai}
+- `external_integrations`: object {auth, payment, other}
+- `scale`: string
+- `performance`: string
+- `ui_ux`: object {style, accessibility, dark_mode}
+- `mcp_enabled`: boolean
+- `mcp_services`: array (if partial)
+- `github_repo`: string
+- `sprint_plan_file`: string
+
+## Error Handling
+
+- If user provides unclear answers, ask clarifying questions
+- If conflicting requirements detected, point out conflicts and ask for resolution
+- If infeasible requirements (e.g., large scale with no cloud), explain constraints
+- Always validate GitHub repo format before configuring scripts
+
+## Output
+
+Generate comprehensive technical requirements document and configure repository for sprint planning and issue tracking.

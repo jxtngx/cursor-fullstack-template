@@ -69,6 +69,7 @@ graph TD
 
 | Role | Owns |
 |------|------|
+| Product Manager | Product discovery, requirements gathering, stakeholder management, handoffs |
 | Scrum Master | Sprint process, velocity tracking, blocker removal |
 | Frontend Engineer | frontend/, UI components, Shadcn integration |
 | Backend Engineer | backend/, API routes, database models, AI integration |
