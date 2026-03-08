@@ -1,10 +1,8 @@
 ---
-ticket: TEST-002
-title: E2E Chat Flow Test
-owner: Test Developer
-points: 2
-dependencies: [FE-002, BE-003]
-phase: Testing & Polish
+name: ""
+overview: ""
+todos: []
+isProject: false
 ---
 
 # TEST-002: E2E Chat Flow Test
@@ -15,12 +13,12 @@ Create end-to-end tests using Playwright to test the complete chat interaction f
 
 ## Acceptance Criteria
 
-- [ ] Playwright test for complete chat interaction
-- [ ] Tests run against LocalStack environment
-- [ ] Verify message sending and receiving
-- [ ] Test streaming responses in UI
-- [ ] Screenshots on test failure
-- [ ] Tests run in CI/CD
+- Playwright test for complete chat interaction
+- Tests run against LocalStack environment
+- Verify message sending and receiving
+- Test streaming responses in UI
+- Screenshots on test failure
+- Tests run in CI/CD
 
 ## Technical Details
 
@@ -299,6 +297,7 @@ Create `e2e/package.json`:
 ## Running Tests
 
 ### Local Testing
+
 ```bash
 cd e2e
 chmod +x setup.sh
@@ -307,16 +306,19 @@ npm test
 ```
 
 ### With UI Mode
+
 ```bash
 npm run test:ui
 ```
 
 ### Specific Test
+
 ```bash
 npx playwright test chat.spec.ts
 ```
 
 ### Debug Mode
+
 ```bash
 npm run test:debug
 ```
@@ -386,13 +388,14 @@ jobs:
 
 ## Definition of Done
 
-- [ ] E2E tests cover complete chat flow
-- [ ] Tests pass with LocalStack backend
-- [ ] Streaming responses verified
-- [ ] Multiple messages tested
-- [ ] Error scenarios covered
-- [ ] Accessibility tests included
-- [ ] Screenshots captured on failure
-- [ ] Tests run in CI/CD pipeline
-- [ ] Code reviewed and approved
-- [ ] Documentation includes running tests
+- E2E tests cover complete chat flow
+- Tests pass with LocalStack backend
+- Streaming responses verified
+- Multiple messages tested
+- Error scenarios covered
+- Accessibility tests included
+- Screenshots captured on failure
+- Tests run in CI/CD pipeline
+- Code reviewed and approved
+- Documentation includes running tests
+

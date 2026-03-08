@@ -1,10 +1,8 @@
 ---
-ticket: INFRA-002
-title: Configure AWS Bedrock Connection
-owner: AWS Engineer
-points: 2
-dependencies: [INFRA-001]
-phase: Infrastructure & Setup
+name: ""
+overview: ""
+todos: []
+isProject: false
 ---
 
 # INFRA-002: Configure AWS Bedrock Connection
@@ -15,11 +13,11 @@ Set up AWS SDK configuration and environment variables to connect to Bedrock (vi
 
 ## Acceptance Criteria
 
-- [ ] AWS SDK configured for both LocalStack and production
-- [ ] Environment variables for Bedrock endpoint and credentials
-- [ ] IAM policy JSON for Bedrock access
-- [ ] Configuration module in backend supports environment switching
-- [ ] Secrets stored in .env (not committed)
+- AWS SDK configured for both LocalStack and production
+- Environment variables for Bedrock endpoint and credentials
+- IAM policy JSON for Bedrock access
+- Configuration module in backend supports environment switching
+- Secrets stored in .env (not committed)
 
 ## Technical Details
 
@@ -117,9 +115,10 @@ def get_bedrock_client():
 
 ## Definition of Done
 
-- [ ] Configuration module loads environment variables
-- [ ] AWS client connects to LocalStack in development
-- [ ] IAM policy documented for production deployment
-- [ ] README updated with configuration instructions
-- [ ] No credentials committed to git
-- [ ] Code reviewed and approved
+- Configuration module loads environment variables
+- AWS client connects to LocalStack in development
+- IAM policy documented for production deployment
+- README updated with configuration instructions
+- No credentials committed to git
+- Code reviewed and approved
+
