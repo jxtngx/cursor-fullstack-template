@@ -111,10 +111,43 @@ If user selected "customize", ask:
 
 #### Q4: Product Name and Overview
 
-Ask user to provide:
-- Product name (text input via conversation)
-- One-sentence product description
-- Problem statement (what problem does it solve?)
+**First, provide examples to help the user:**
+
+**One-sentence Description Examples:**
+- "A mobile-first meal planning app that uses AI to generate personalized weekly menus based on dietary preferences and pantry inventory"
+- "A real-time collaboration platform for remote teams to brainstorm ideas using visual boards and AI-powered suggestion features"
+- "A consumer health tracking app that integrates wearable data with AI coaching to provide personalized wellness recommendations"
+
+**Problem Statement Examples:**
+- "Consumers waste time and money on meal planning because they lack personalized recipe suggestions that match their dietary needs and available ingredients"
+- "Remote teams struggle with creative collaboration due to fragmented tools and lack of real-time ideation features, leading to slower project timelines"
+- "Health-conscious consumers find it difficult to make sense of their fitness data and lack actionable insights to improve their wellness journey"
+
+**Then ask for product name using AskQuestion:**
+
+```json
+{
+  "title": "Product Discovery - Product Name",
+  "questions": [
+    {
+      "id": "product-name-choice",
+      "prompt": "What would you like to name your product? Choose from suggestions or provide your own name",
+      "options": [
+        {"id": "suggestion-1", "label": "MealMind - AI-powered meal planning assistant"},
+        {"id": "suggestion-2", "label": "CollabCanvas - Visual collaboration workspace"},
+        {"id": "custom-name", "label": "I have my own product name (please provide it in chat after selecting)"}
+      ],
+      "allow_multiple": false
+    }
+  ]
+}
+```
+
+If user selects "custom-name", ask them to provide their product name in the conversation.
+
+**Then gather description and problem statement conversationally:**
+- Ask: "Please provide a one-sentence description of your product (see examples above for reference)"
+- Ask: "Please describe the problem your product solves (see examples above for reference)"
 
 #### Q5: Core Features
 
