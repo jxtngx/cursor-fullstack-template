@@ -17,7 +17,7 @@ Defines the Product Manager role including:
 - Integration with MCP agents (Notion, Linear, Discord)
 
 ### 2. Product Discovery Command
-**Location**: `.cursor/commands/product-discovery.md`
+**Location**: `.cursor/commands/launch-product-discovery.md`
 
 Implements the conditional questionnaire sequence:
 - 11 structured questions using AskQuestion tool
@@ -257,7 +257,7 @@ Three-phase approach:
 ├── agents/
 │   └── product-manager.md                  [Agent definition]
 ├── commands/
-│   ├── product-discovery.md                [Question sequence]
+│   ├── launch-product-discovery.md         [Question sequence]
 │   └── configure-github-issue-script.md    [Script configuration]
 ├── protocols/
 │   ├── handoff-pm-to-architect.md          [PM → Architect]
