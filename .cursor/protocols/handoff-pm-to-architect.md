@@ -23,6 +23,10 @@ Before handing off to Chief Architect, ensure:
 - [ ] GitHub repository configured in create-github-issue.sh
 - [ ] Sprint plan file name determined
 - [ ] User has approved the requirements
+- [ ] Research reports incorporated (if applicable)
+- [ ] System architecture diagrams included (Figma exports or Mermaid)
+- [ ] UI wireframes included (if applicable)
+- [ ] Design specifications documented (if applicable)
 
 ## Handoff Message Template
 
@@ -76,6 +80,32 @@ Please validate the following:
 - **Expected Scale**: [Scale tier]
 - **AWS Services**: [List]
 - **MCP Integrations**: [Enabled/Disabled]
+
+## Research and Design Outputs
+
+### Scientific Research
+- **Engaged**: [Yes/No]
+- **Mode**: [MCP/Collaboration/N/A]
+- **Domain**: [Domain]
+- **Key Findings**: [Summary]
+- **MCP Research Report**: [Path]
+
+### Business Research
+- **Engaged**: [Yes/No]
+- **Mode**: [MCP/Collaboration/N/A]
+- **Vertical**: [Vertical]
+- **Key Findings**: [Summary]
+- **Compliance Requirements**: [List]
+- **MCP Research Report**: [Path]
+
+### Design Outputs
+- **System Diagrams**: [Figma links and export paths or Mermaid code locations]
+- **UI Wireframes**: [Figma links or text descriptions] (if created)
+- **Design Specs**: [Document path] (if created)
+- **Designer Mode**: [MCP/Collaboration]
+
+### Designer Collaboration Status
+**Note**: System diagrams have already been reviewed and approved by Chief Architect during the design phase. This handoff includes the final validated diagrams.
 
 ## Next Steps
 

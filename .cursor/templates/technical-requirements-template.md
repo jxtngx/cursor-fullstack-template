@@ -20,6 +20,38 @@ uses_template_defaults: [true/false]
 sprint_plan_file: .cursor/plans/project-init/[product-name]-sprint.plan.md
 github_repo: [owner/repo]
 mcp_integrations_enabled: [true/false]
+specialist_agents:
+  scientific_researcher:
+    engaged: [true | false]
+    mode: [mcp | collaboration | not_engaged]
+    domain: "[Domain]"
+    report_path: "[Path to report]"
+  business_researcher:
+    engaged: [true | false]
+    mode: [mcp | collaboration | not_engaged]
+    vertical: "[Vertical]"
+    report_path: "[Path to report]"
+  designer:
+    system_diagrams: true
+    ui_wireframes: [true | false]
+    mode: [mcp | collaboration]
+design_outputs:
+  system_diagrams:
+    - name: "High-Level Architecture"
+      figma_url: "[Link]"
+      export_path: "docs/diagrams/architecture.png"
+    - name: "Component Diagram"
+      figma_url: "[Link]"
+      export_path: "docs/diagrams/components.png"
+    - name: "Data Flow Diagram"
+      figma_url: "[Link]"
+      export_path: "docs/diagrams/data-flow.png"
+  wireframes:
+    created: [true | false]
+    figma_url: "[Link]"
+  design_specs:
+    created: [true | false]
+    document_path: "[Path]"
 todos:
   - id: phase-1-foundation
     content: Phase 1 - Foundation Setup
@@ -56,6 +88,26 @@ As a [user role], I want [capability] so that [benefit].
 
 ### Persona 2: [Name/Role]
 [Repeat structure]
+
+## Research Findings
+
+### Scientific Research
+[If engaged - Summary of Claude MCP research or collaboration guidance]
+- **Domain**: [AI/ML, Bioinformatics, etc.]
+- **Key Findings**: [Research-backed insights]
+- **Recommended Technologies**: [With rationale]
+- **Technical Risks**: [Identified concerns]
+- **References**: [Research sources or general guidance notes]
+- **Report**: [Link to detailed research report]
+
+### Business Research  
+[If engaged - Summary of Claude MCP research or collaboration guidance]
+- **Vertical**: [E-commerce, Healthcare, etc.]
+- **Market Insights**: [Industry analysis]
+- **Regulatory Requirements**: [Compliance needs]
+- **Business Risks**: [Market concerns]
+- **References**: [Industry sources or general guidance notes]
+- **Report**: [Link to detailed research report]
 
 ## Core Features (MVP Scope)
 
@@ -196,6 +248,81 @@ This product uses MCP (Model Context Protocol) integrations for work tracking:
 
 [If mcp_integrations_enabled = false:]
 Manual work tracking using GitHub Issues only.
+
+## System Architecture Diagrams
+
+### High-Level Architecture
+![System Architecture](path/to/diagram-1.png)
+[Figma Link or Mermaid code]
+
+**Description**: [Brief description of the high-level architecture showing main system components and their relationships]
+
+### Component Diagram
+![Components](path/to/diagram-2.png)
+[Figma Link or Mermaid code]
+
+**Description**: [Brief description of detailed component view showing services and modules]
+
+### Data Flow Diagram
+![Data Flow](path/to/diagram-3.png)
+[Figma Link or Mermaid code]
+
+**Description**: [Brief description of how data flows through the system]
+
+[If deployment architecture diagram created]:
+### Deployment Architecture
+![Deployment](path/to/diagram-4.png)
+[Figma Link or Mermaid code]
+
+**Description**: [Brief description of infrastructure and cloud resources]
+
+## UI Design (If Applicable)
+
+[If ui_wireframes created]:
+
+### Wireframes
+
+#### Flow 1: [Flow Name]
+![Flow 1 Screens](path/to/wireframes/flow-1/)
+[Figma Link or text description]
+
+**Screens**:
+- Screen 1: [Name and description]
+- Screen 2: [Name and description]
+
+**Key Interactions**:
+- [Interaction 1 description]
+- [Interaction 2 description]
+
+#### Flow 2: [Flow Name]
+[Repeat structure]
+
+### Design Specifications
+
+[If design_specs created - MCP mode only]:
+
+**Color Palette**:
+- Primary: #[hex]
+- Secondary: #[hex]
+- Accent: #[hex]
+- Background: #[hex]
+- Text: #[hex]
+
+**Typography**:
+- Heading 1: [Font family, size, weight]
+- Heading 2: [Font family, size, weight]
+- Body: [Font family, size, weight]
+
+**Spacing System**:
+- Base unit: [px]
+- Scale: [spacing values]
+
+**Component Standards**:
+- Buttons: [Specifications]
+- Forms: [Specifications]
+- Cards: [Specifications]
+
+[If using Shadcn UI defaults, note alignment with standard components]
 
 ## Architecture Overview
 

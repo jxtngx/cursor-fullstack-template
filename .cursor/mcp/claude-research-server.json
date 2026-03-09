@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "claude-research": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-claude"],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+      },
+      "capabilities": {
+        "resources": true,
+        "tools": true,
+        "prompts": true
+      }
+    }
+  }
+}

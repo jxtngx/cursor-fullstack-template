@@ -115,6 +115,8 @@ git commit -m "[UI-003] Build login form component"
 | `API-###` | API endpoint implementation | Backend Engineer |
 | `UI-###` | UI components and pages | Frontend Engineer |
 | `DB-###` | Database schema, migrations, models | Backend Engineer |
+| `AGENT-###` | Agent architecture and LangChain implementation | AI Engineer |
+| `MODEL-###` | Model training, tuning, deployment | ML Engineer |
 | `TEST-###` | Testing (unit, integration, E2E) | Test Developer |
 | `DOC-###` | Documentation (API docs, README, guides) | Various |
 | `INFRA-###` | Infrastructure, DevOps, deployment | AWS Engineer |
@@ -134,10 +136,12 @@ git commit -m "[UI-003] Build login form component"
 - `API-002` - Create user registration endpoint
 - `UI-003` - Build user registration form
 - `DB-004` - Create users table schema
-- `TEST-005` - Unit tests for user registration
-- `DOC-006` - Document authentication API
-- `INFRA-007` - Configure Docker Compose
-- `OBS-008` - Setup SigNoz dashboards
+- `AGENT-005` - Implement RAG chain for document retrieval
+- `MODEL-006` - Fine-tune classification model on domain data
+- `TEST-007` - Unit tests for user registration
+- `DOC-008` - Document authentication API
+- `INFRA-009` - Configure Docker Compose
+- `OBS-010` - Setup SigNoz dashboards
 
 **Bad Ticket Names** (avoid):
 - `FEATURE-1` - Inconsistent format

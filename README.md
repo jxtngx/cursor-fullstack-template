@@ -59,6 +59,13 @@ Based on the opinionated technology choices, you'll need accounts for the follow
 | [Linear](https://linear.app) | Issue tracking, project management | ✅ Yes (up to 10 users) | ✅ Recommended |
 | [Discord](https://discord.com) | Team communication, bot notifications | ✅ Yes | ✅ Recommended |
 
+### MCP Servers for Specialist Agents (Optional)
+
+| Service | Purpose | Free Tier | Required |
+|---------|---------|-----------|----------|
+| [Anthropic Claude API](https://anthropic.com) | Research via Claude MCP (Scientific & Business Researchers) | ❌ Pay per use | ⚪ Optional (for research agents) |
+| [Figma](https://figma.com) | Design via Figma MCP (Designer agent) | ✅ Yes (free tier) | ⚪ Optional (for designer agent) |
+
 ### Development Tools
 
 | Service | Purpose | Free Tier | Required |

@@ -52,10 +52,14 @@ graph TD
     subgraph team [Team]
         SM[Scrum Master] -.Sprint Process.-> FE
         SM -.Sprint Process.-> BE
+        SM -.Sprint Process.-> AIE
+        SM -.Sprint Process.-> MLE
         SM -.Sprint Process.-> TD
         SM -.Sprint Process.-> AWS
         FE[Frontend Engineer] --> frontend
         BE[Backend Engineer] --> backend
+        AIE[AI Engineer] --> AI
+        MLE[ML Engineer] --> AI
         AWS[AWS Engineer] --> infra
         TD[Test Developer] --> Tests[tests/]
         TD --> E2E[E2E Tests]
@@ -67,17 +71,23 @@ graph TD
 
 ## Team
 
-| Role | Owns |
-|------|------|
-| Product Manager | Product discovery, requirements gathering, stakeholder management, handoffs |
-| Scrum Master | Sprint process, velocity tracking, blocker removal |
-| Frontend Engineer | frontend/, UI components, Shadcn integration |
-| Backend Engineer | backend/, API routes, database models, AI integration |
-| AWS Engineer | Docker, AWS, LocalStack, monitoring, observability |
-| Test Developer | Unit tests, integration tests, E2E tests, CI/CD |
-| Notion Engineer | Notion MCP, documentation, knowledge base, sprint sync |
-| Linear Engineer | Linear MCP, issue tracking, project management, workflow |
-| Discord Engineer | Discord MCP, notifications, bot commands, team communication |
+| Role | Owns | MCP Integration |
+|------|------|-----------------|
+| Product Manager | Product discovery, requirements, handoffs | - |
+| Scientific Researcher | Scientific/technical domain research | Claude MCP |
+| Business Researcher | Business vertical/market research | Claude MCP |
+| Designer | System diagrams, UI wireframes, design specs | Figma MCP |
+| Chief Architect | Architecture validation, technology decisions | - |
+| Scrum Master | Sprint process, velocity tracking | - |
+| Frontend Engineer | frontend/, UI components, Shadcn integration | - |
+| Backend Engineer | backend/, API routes, database models | - |
+| AI Engineer | Agent architecture, LangChain, agentic workflows | - |
+| ML Engineer | Model training, fine-tuning, MLOps, deployment | - |
+| AWS Engineer | Docker, AWS, LocalStack, monitoring, observability | - |
+| Test Developer | Unit tests, integration tests, E2E tests, CI/CD | - |
+| Notion Engineer | Notion MCP, documentation, knowledge base, sprint sync | Notion MCP |
+| Linear Engineer | Linear MCP, issue tracking, project management, workflow | Linear MCP |
+| Discord Engineer | Discord MCP, notifications, bot commands, team communication | Discord MCP |
 
 ## Authority
 
@@ -115,3 +125,121 @@ The team uses Model Context Protocol (MCP) integrations for work tracking:
 - Linear is source of truth for issue status
 - Notion is source of truth for documentation
 - Discord is notification layer only (no state)
+
+## Collaboration with Designer
+
+After receiving enhanced technical requirements from Product Manager (with optional research reports), collaborate with Designer on system architecture diagrams.
+
+### Step 1: Receive Design Package
+
+Designer provides initial system diagrams:
+- High-level architecture diagram
+- Component diagram showing services
+- Data flow diagram
+- Deployment architecture (if complex)
+- Integration diagram (if many external services)
+
+Diagrams are delivered via:
+- **MCP Mode**: Figma files with shareable links and PNG/SVG exports
+- **Collaboration Mode**: Mermaid diagrams embedded in markdown
+
+### Step 2: Review for Technical Accuracy
+
+Evaluate diagrams for:
+
+**Component Relationships**:
+- Are all services and components correctly represented?
+- Are dependencies and connections accurate?
+- Is the frontend-backend boundary clear?
+- Are data stores properly positioned?
+
+**Data Flows**:
+- Do data flows match the actual architecture?
+- Are request/response patterns correct?
+- Are async/sync operations distinguished?
+- Are message queues and event flows accurate?
+
+**Integrations**:
+- Are external APIs and services shown?
+- Are cloud services (AWS) correctly depicted?
+- Are MCP integrations represented?
+- Is authentication/authorization flow clear?
+
+**Technical Correctness**:
+- Do technology choices match technical requirements?
+- Are deployment patterns accurate?
+- Is scaling strategy represented correctly?
+- Are security boundaries shown?
+
+### Step 3: Provide Feedback
+
+Use this format for feedback:
+
+```markdown
+## System Diagram Review - [Product Name]
+
+### High-Level Architecture
+**Status**: [Approved | Needs Revision]
+**Feedback**:
+- [Specific technical correction 1]
+- [Specific technical correction 2]
+- [What's correct and should remain]
+
+### Component Diagram
+**Status**: [Approved | Needs Revision]
+**Feedback**:
+- [Specific technical correction 1]
+- [Specific technical correction 2]
+
+### Data Flow Diagram
+**Status**: [Approved | Needs Revision]
+**Feedback**:
+- [Specific technical correction 1]
+- [Specific technical correction 2]
+
+### Overall Assessment
+[Summary: approve all, approve with minor changes, or needs significant revision]
+```
+
+### Step 4: Iterative Refinement
+
+**If revisions needed**:
+1. Designer updates diagrams based on feedback
+2. Designer re-shares updated diagrams
+3. Review updated diagrams
+4. Repeat until all diagrams approved
+
+**Iteration Guidelines**:
+- Be specific and actionable in feedback
+- Focus on technical accuracy, not visual style
+- Approve quickly when technically correct
+- Aim for 2-3 iterations maximum
+- Escalate to Product Manager if stuck
+
+### Step 5: Final Approval
+
+Once diagrams are technically accurate:
+1. Approve all system diagrams
+2. Confirm diagrams ready for technical requirements integration
+3. Designer hands off to Product Manager
+4. PM integrates diagrams into requirements document
+
+### Step 6: Validate Complete Package
+
+After PM integrates all specialist outputs, receive final package:
+- Enhanced technical requirements document
+- Research reports (if researchers engaged)
+- System architecture diagrams (approved)
+- UI wireframes (if created)
+- Design specifications (if created)
+
+Perform final validation:
+- Technical feasibility confirmed
+- Architecture patterns defined
+- Research recommendations incorporated
+- Diagrams accurately represent architecture
+- Ready for Scrum Master sprint planning
+
+### Step 7: Handoff to Scrum Master
+
+Once validated, proceed with normal handoff to Scrum Master for sprint planning.

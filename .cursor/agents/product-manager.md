@@ -111,6 +111,157 @@ isProject: false
 14. **Definition of Done**: Success criteria for MVP
 15. **Success Metrics**: KPIs and measurement approach
 
+## Phase 3.5: Research and Design Engagement (Conditional)
+
+After generating initial technical requirements, engage specialist agents to enhance and validate the requirements.
+
+### Step 1: Assessment
+
+Use `.cursor/commands/engage-research-design.md` to determine:
+- Is Scientific Researcher needed? (AI/ML, bioinformatics, complex technical domains)
+- Is Business Researcher needed? (Regulated industries, specific business verticals)
+- What is Designer scope? (System diagrams always, UI wireframes conditionally)
+
+### Step 2: Parallel Research (If Researchers Engaged)
+
+If researchers are needed:
+1. Hand off initial technical requirements to Scientific Researcher (if engaged)
+2. Hand off initial technical requirements to Business Researcher (if engaged)
+3. Researchers conduct independent research using Claude MCP (if configured) or collaboration mode
+4. Wait for research reports from both researchers
+
+**Research Report Locations**:
+- Scientific: `.cursor/research/scientific-[product-name]-[date].md`
+- Business: `.cursor/research/business-[product-name]-[date].md`
+
+### Step 3: Designer Engagement (Always)
+
+Designer is ALWAYS engaged:
+1. Hand off requirements (with research reports if applicable) to Designer
+2. Designer creates system architecture diagrams (always)
+   - High-level architecture
+   - Component diagram
+   - Data flow diagram
+3. Chief Architect reviews and provides feedback on diagrams
+4. Designer iterates until diagrams approved
+5. Designer creates UI wireframes (if product is UI-heavy)
+6. Product Manager reviews wireframes for feature alignment
+7. Designer iterates until wireframes approved (if created)
+
+**Design Outputs**:
+- System diagrams: `.cursor/diagrams/[product-name]/`
+- UI wireframes: `.cursor/wireframes/[product-name]/` (if created)
+- Design specs: `.cursor/design-specs/[product-name].md` (if created, MCP mode)
+
+### Step 4: Consolidation
+
+Review and integrate all specialist outputs:
+
+**Research Findings** (if researchers engaged):
+- Review scientific research report for technical recommendations
+- Review business research report for compliance requirements
+- Identify any conflicts between recommendations
+- Resolve tensions (e.g., security vs. performance trade-offs)
+- Prioritize recommendations based on product goals
+
+**Design Outputs** (always):
+- Integrate approved system diagrams into requirements
+- Add UI wireframes if created
+- Link to Figma files (MCP mode) or embed Mermaid diagrams (collaboration mode)
+- Include design specifications if created
+
+### Step 5: Enhanced Requirements
+
+Update technical requirements document with:
+
+**Research Sections** (if applicable):
+```markdown
+## Research Findings
+
+### Scientific Research
+[If engaged - Summary of Claude MCP research or collaboration guidance]
+- Domain: [AI/ML, Bioinformatics, etc.]
+- Key Findings: [Research-backed insights]
+- Recommended Technologies: [With rationale]
+- Technical Risks: [Identified concerns]
+- References: [Research sources or general guidance notes]
+
+### Business Research  
+[If engaged - Summary of Claude MCP research or collaboration guidance]
+- Vertical: [E-commerce, Healthcare, etc.]
+- Market Insights: [Industry analysis]
+- Regulatory Requirements: [Compliance needs]
+- Business Risks: [Market concerns]
+- References: [Industry sources or general guidance notes]
+```
+
+**Design Sections** (always):
+```markdown
+## System Architecture Diagrams
+
+### High-Level Architecture
+![System Architecture](path/to/diagram-1.png)
+[Figma Link or Mermaid code]
+
+### Component Diagram
+![Components](path/to/diagram-2.png)
+[Figma Link or Mermaid code]
+
+### Data Flow Diagram
+![Data Flow](path/to/diagram-3.png)
+[Figma Link or Mermaid code]
+
+## UI Design (If Applicable)
+
+### Wireframes
+[If created - Figma wireframes or text descriptions for key flows]
+
+### Design Specifications
+[If created - Design system details]
+```
+
+**Frontmatter Updates**:
+```yaml
+specialist_agents:
+  scientific_researcher:
+    engaged: [true | false]
+    mode: [mcp | collaboration | not_engaged]
+    domain: "[Domain]"
+    report_path: "[Path to report]"
+  business_researcher:
+    engaged: [true | false]
+    mode: [mcp | collaboration | not_engaged]
+    vertical: "[Vertical]"
+    report_path: "[Path to report]"
+  designer:
+    system_diagrams: true
+    ui_wireframes: [true | false]
+    mode: [mcp | collaboration]
+
+design_outputs:
+  system_diagrams:
+    - name: "High-Level Architecture"
+      figma_url: "[Link]"
+      export_path: "docs/diagrams/architecture.png"
+  wireframes:
+    created: [true | false]
+    figma_url: "[Link]"
+  design_specs:
+    created: [true | false]
+    document_path: "[Path]"
+```
+
+### Step 6: Handoff to Chief Architect
+
+Provide Chief Architect with complete enhanced package:
+- Enhanced technical requirements document
+- Research reports (if engaged)
+- System architecture diagrams (already approved by CA during design phase)
+- UI wireframes (if created)
+- Design specifications (if created)
+
+Chief Architect performs final validation of the complete package and proceeds to Scrum Master handoff.
+
 ## Handoff Protocol
 
 ### To Chief Architect

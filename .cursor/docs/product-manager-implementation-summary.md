@@ -179,6 +179,20 @@ Three-phase approach:
 
 ## Usage Workflow
 
+### Enhanced Workflow with MCP Agents
+
+1. **Product Manager** → Discovery (user questionnaire)
+2. **Product Manager** → Generate initial technical requirements
+3. **Assessment** → Determine research/design needs (`.cursor/commands/engage-research-design.md`)
+4. **Scientific Researcher** → Claude MCP research (conditional, based on AI/ML or complex domain indicators)
+5. **Business Researcher** → Claude MCP research (conditional, based on regulated industry or business vertical indicators)
+6. **Product Manager** → Consolidate research findings
+7. **Designer** → System diagrams via Figma MCP (always, reviewed by Chief Architect)
+8. **Designer** → UI wireframes via Figma MCP (conditional, for UI-heavy products)
+9. **Product Manager** → Enhance technical requirements with research and design outputs
+10. **Chief Architect** → Final validation of complete package
+11. **Scrum Master** → Sprint Planning
+
 ### For Product Managers
 
 1. **Initiate Discovery**:
@@ -195,15 +209,38 @@ Three-phase approach:
    - Validate generated technical requirements
    - Request changes if needed
 
-4. **Configure Repository**:
+4. **Assess Research and Design Needs**:
+   - Automatic triggers check for specialist engagement
+   - Determine Scientific Researcher (AI/ML, bioinformatics, complex domains)
+   - Determine Business Researcher (regulated industries, business verticals)
+   - Determine Designer scope (system diagrams always, wireframes conditionally)
+   - Confirm MCP availability (Claude MCP, Figma MCP)
+
+5. **Engage Specialists** (if needed):
+   - Hand off to Scientific Researcher (if engaged)
+   - Hand off to Business Researcher (if engaged)
+   - Wait for research reports
+   - Hand off to Designer (always)
+   - Wait for system diagrams (Chief Architect reviews during design phase)
+   - Wait for UI wireframes (if created)
+
+6. **Consolidate Findings**:
+   - Review research reports
+   - Incorporate recommendations into technical requirements
+   - Add system diagrams
+   - Add UI wireframes (if created)
+   - Update frontmatter with specialist metadata
+
+7. **Configure Repository**:
    - Provide GitHub repo
    - Confirm sprint plan filename
 
-5. **Hand Off to Chief Architect**:
+8. **Hand Off to Chief Architect**:
    - Use handoff protocol template
-   - Wait for validation
+   - Include research reports and design outputs
+   - Wait for final validation
 
-6. **Hand Off to Scrum Master**:
+9. **Hand Off to Scrum Master**:
    - After Chief Architect approval
    - Request sprint plan creation
 
@@ -255,16 +292,28 @@ Three-phase approach:
 ```
 .cursor/
 ├── agents/
-│   └── product-manager.md                  [Agent definition]
+│   ├── product-manager.md                  [Agent definition]
+│   ├── scientific-researcher.md            [Scientific research agent]
+│   ├── business-researcher.md              [Business research agent]
+│   └── designer.md                         [Designer agent]
 ├── commands/
 │   ├── launch-product-discovery.md         [Question sequence]
-│   └── configure-github-issue-script.md    [Script configuration]
+│   ├── configure-github-issue-script.md    [Script configuration]
+│   └── engage-research-design.md           [Specialist assessment]
 ├── protocols/
 │   ├── handoff-pm-to-architect.md          [PM → Architect]
-│   └── handoff-pm-to-scrummaster.md        [PM → Scrum Master]
+│   ├── handoff-pm-to-scrummaster.md        [PM → Scrum Master]
+│   ├── researcher-collaboration.md         [Researcher workflow]
+│   └── designer-collaboration.md           [Designer workflow]
 ├── templates/
 │   ├── technical-requirements-template.md  [Tech req template]
 │   └── sprint-plan-structure-guide.md      [Sprint plan guide]
+├── docs/
+│   ├── mcp-setup-claude.md                 [Claude MCP setup]
+│   └── mcp-setup-figma.md                  [Figma MCP setup]
+├── mcp/
+│   ├── claude-research-server.json         [Claude MCP config]
+│   └── figma-design-server.json            [Figma MCP config]
 └── plans/
     └── project-init/
         └── [Generated plans go here]
@@ -273,7 +322,10 @@ Three-phase approach:
 ## Integration Points
 
 ### With Existing Agents
-- **Chief Architect**: Validation and architecture patterns
+- **Scientific Researcher**: Domain research (conditional)
+- **Business Researcher**: Vertical research (conditional)
+- **Designer**: System diagrams and UI wireframes
+- **Chief Architect**: Validation, architecture patterns, diagram review
 - **Scrum Master**: Sprint planning and ticket generation
 - **Engineering Agents**: Receive tickets and implement
 - **MCP Agents**: Work tracking sync (optional)

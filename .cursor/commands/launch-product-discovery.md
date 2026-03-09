@@ -440,9 +440,99 @@ Please review and validate:
 After validation, please update agent files with project-specific context.
 ```
 
-### 7. Handoff to Scrum Master
+### 7. Assess Research and Design Needs
 
-After Chief Architect validation:
+After initial technical requirements are approved, determine which specialist agents to engage.
+
+Use `.cursor/commands/engage-research-design.md` logic to assess:
+
+**Automatic Triggers**:
+
+Check for **Scientific Researcher** engagement:
+- AI/ML indicators (keywords: AI, ML, models, neural, algorithm)
+- Bioinformatics (keywords: genomics, sequence, molecular, biological)
+- Complex domains (physics, chemistry, scientific computing)
+- AWS Bedrock or SageMaker in services
+- HuggingFace/LangChain in tech stack
+
+Check for **Business Researcher** engagement:
+- Regulated industries (healthcare, finance, legal, insurance)
+- Business verticals (e-commerce, SaaS, marketplace, fintech, edtech)
+- Compliance keywords (HIPAA, PCI-DSS, GDPR, SOX)
+- Complex business models
+
+Check for **Designer wireframe** scope:
+- UI-heavy products (dashboard, complex forms, multi-step flows)
+- B2C applications
+- Consumer-facing interfaces
+- User explicitly wants UI design
+
+**Note**: Designer is ALWAYS engaged for system diagrams, regardless of product type.
+
+**If triggers are unclear**, ask the user:
+
+```json
+{
+  "title": "Specialist Support Assessment",
+  "questions": [
+    {
+      "id": "research-needed",
+      "prompt": "Your product may benefit from specialist research. Would you like deep domain expertise?",
+      "options": [
+        {"id": "scientific", "label": "Yes - Scientific/technical domain research (uses Claude MCP if configured)"},
+        {"id": "business", "label": "Yes - Business vertical/market research (uses Claude MCP if configured)"},
+        {"id": "both-research", "label": "Yes - Both scientific and business research"},
+        {"id": "no-research", "label": "No - Standard validation is sufficient"}
+      ],
+      "allow_multiple": false
+    },
+    {
+      "id": "ui-design-needed",
+      "prompt": "Should we create UI wireframes for your product?",
+      "options": [
+        {"id": "yes-wireframes", "label": "Yes - Create wireframes for key user flows (uses Figma MCP if configured)"},
+        {"id": "no-wireframes", "label": "No - System diagrams only (always included)"}
+      ],
+      "allow_multiple": false
+    }
+  ]
+}
+```
+
+**Document engagement in technical requirements frontmatter**:
+
+```yaml
+specialist_agents:
+  scientific_researcher:
+    engaged: [true | false]
+    mode: [mcp | collaboration | not_engaged]
+    domain: "[Domain]"
+  business_researcher:
+    engaged: [true | false]
+    mode: [mcp | collaboration | not_engaged]
+    vertical: "[Vertical]"
+  designer:
+    system_diagrams: true
+    ui_wireframes: [true | false]
+    mode: [mcp | collaboration]
+```
+
+**If specialists engaged**:
+1. Hand off technical requirements to researchers (if engaged)
+2. Wait for research reports
+3. Hand off to Designer (always)
+4. Wait for system diagrams (Chief Architect reviews)
+5. Wait for UI wireframes (if created, Product Manager reviews)
+6. Consolidate findings into enhanced technical requirements
+7. Update technical requirements document with:
+   - Research findings sections
+   - System architecture diagrams
+   - UI wireframes (if created)
+   - Design specifications (if created)
+
+### 8. Handoff to Scrum Master
+
+After Chief Architect validation and all specialist work complete:
 
 ```
 @scrum-master
@@ -450,6 +540,16 @@ After Chief Architect validation:
 Technical requirements for [Product Name] have been validated.
 
 Requirements File: .cursor/plans/project-init/[filename].plan.md
+
+[If research conducted]:
+Research reports:
+- Scientific: [Path to report]
+- Business: [Path to report]
+
+[If design outputs]:
+Design outputs:
+- System diagrams: [Paths or Figma links]
+- UI wireframes: [Paths or Figma links] (if created)
 
 Please create sprint plan following sprint-plan-example.plan.md with:
 - Ticket naming: FEAT-###, API-###, UI-###, DB-###, TEST-###, DOC-###, INFRA-###
