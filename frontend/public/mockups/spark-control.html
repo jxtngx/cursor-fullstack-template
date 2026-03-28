@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spark Control — DGX Spark Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #0c0c0e;
+    --bg-surface: #131316;
+    --bg-elevated: #1a1a1f;
+    --bg-hover: #222228;
+    --bg-active: #2a2a32;
+    --border: #27272e;
+    --border-subtle: #1e1e24;
+    --text-primary: #e8e6e3;
+    --text-secondary: #8b8993;
+    --text-tertiary: #5c5a63;
+    --accent-green: #76b900;
+    --accent-green-dim: #76b90033;
+    --accent-green-glow: #76b90018;
+    --accent-amber: #f59e0b;
+    --accent-amber-dim: #f59e0b22;
+    --accent-red: #ef4444;
+    --accent-red-dim: #ef444422;
+    --accent-blue: #60a5fa;
+    --accent-blue-dim: #60a5fa22;
+    --accent-purple: #a78bfa;
+    --accent-purple-dim: #a78bfa22;
+    --accent-cyan: #22d3ee;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --titlebar-h: 52px;
+    --sidebar-w: 260px;
+    --detail-w: 380px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Instrument Sans', -apple-system, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── WINDOW CHROME ─── */
+  .window {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--bg-base);
+  }
+
+  .titlebar {
+    height: var(--titlebar-h);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    -webkit-app-region: drag;
+    flex-shrink: 0;
+  }
+
+  .traffic-lights {
+    display: flex;
+    gap: 8px;
+    margin-right: 8px;
+  }
+  .traffic-lights span {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    display: block;
+  }
+  .tl-close { background: #ff5f57; }
+  .tl-minimize { background: #febc2e; }
+  .tl-maximize { background: #28c840; }
+
+  .titlebar-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: -0.01em;
+  }
+
+  .titlebar-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--accent-green-dim);
+    border: 1px solid var(--accent-green)33;
+  }
+  .titlebar-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse-dot 2s ease infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent-green); }
+    50% { opacity: 0.7; box-shadow: 0 0 8px 2px var(--accent-green); }
+  }
+  .titlebar-badge span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent-green);
+  }
+
+  .spark-stats {
+    display: flex;
+    gap: 16px;
+    margin-left: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+  }
+  .spark-stats .stat-val { color: var(--text-secondary); font-weight: 500; }
+
+  /* ─── LAYOUT ─── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .sidebar-section {
+    padding: 16px 12px 8px;
+  }
+  .sidebar-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    padding: 0 8px;
+    margin-bottom: 8px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+  }
+  .nav-item .icon {
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    opacity: 0.7;
+  }
+  .nav-item.active .icon { opacity: 1; }
+  .nav-item .count {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--bg-active);
+    padding: 2px 6px;
+    border-radius: 10px;
+    color: var(--text-tertiary);
+  }
+  .nav-item.active .count {
+    background: var(--accent-green)22;
+    color: var(--accent-green);
+  }
+
+  .sidebar-divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 4px 12px;
+  }
+
+  /* Spark Identity Card */
+  .spark-card {
+    margin: auto 12px 12px;
+    padding: 14px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, #76b90012, #76b90005);
+    border: 1px solid var(--accent-green)18;
+    position: relative;
+    overflow: hidden;
+  }
+  .spark-card::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 100px; height: 100px;
+    background: radial-gradient(circle, var(--accent-green)08, transparent 70%);
+  }
+  .spark-card .device-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+  .spark-card .device-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent-green);
+    margin-bottom: 10px;
+  }
+  .spark-card .device-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .spark-card .ds {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-tertiary);
+  }
+  .spark-card .ds strong {
+    color: var(--text-secondary);
+    font-weight: 600;
+    display: block;
+  }
+
+  /* ─── MAIN CONTENT ─── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    flex: 1;
+    max-width: 400px;
+    transition: border-color 0.15s;
+  }
+  .search-box:focus-within { border-color: var(--accent-green)66; }
+  .search-box .search-icon { color: var(--text-tertiary); font-size: 13px; }
+  .search-box input {
+    background: none; border: none; outline: none;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    width: 100%;
+  }
+  .search-box input::placeholder { color: var(--text-tertiary); }
+  .search-box .shortcut {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: var(--bg-active);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
+
+  .toolbar-btn {
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .toolbar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .toolbar-btn.primary {
+    background: var(--accent-green);
+    border-color: var(--accent-green);
+    color: #000;
+    font-weight: 600;
+  }
+  .toolbar-btn.primary:hover { filter: brightness(1.1); }
+
+  .view-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-left: auto;
+  }
+  .view-toggle button {
+    padding: 6px 10px;
+    background: var(--bg-elevated);
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .view-toggle button.active {
+    background: var(--bg-active);
+    color: var(--text-primary);
+  }
+
+  /* Content Grid */
+  .content-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .model-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+
+  .list-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 0.8fr 0.8fr 100px;
+    padding: 0 12px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 4px;
+  }
+
+  .model-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 0.8fr 0.8fr 100px;
+    align-items: center;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+  }
+  .model-row:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-subtle);
+  }
+  .model-row.selected {
+    background: var(--accent-green-glow);
+    border-color: var(--accent-green)33;
+  }
+
+  .model-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .model-icon {
+    width: 36px; height: 36px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .model-icon.gguf { background: var(--accent-green-dim); }
+  .model-icon.safetensors { background: var(--accent-blue-dim); }
+  .model-icon.dataset { background: var(--accent-purple-dim); }
+  .model-icon.checkpoint { background: var(--accent-amber-dim); }
+
+  .model-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+  .model-org {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+  }
+  .model-meta-cell {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+  .model-meta-cell.dim { color: var(--text-tertiary); }
+
+  .quant-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .quant-fp4 { background: var(--accent-green-dim); color: var(--accent-green); }
+  .quant-fp8 { background: var(--accent-blue-dim); color: var(--accent-blue); }
+  .quant-fp16 { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .quant-bf16 { background: var(--accent-purple-dim); color: var(--accent-purple); }
+  .quant-q4 { background: var(--accent-cyan)22; color: var(--accent-cyan); }
+
+  .status-indicator {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .status-loaded .status-dot { background: var(--accent-green); }
+  .status-loaded { color: var(--accent-green); }
+  .status-cached .status-dot { background: var(--accent-amber); }
+  .status-cached { color: var(--accent-amber); }
+  .status-available .status-dot { background: var(--text-tertiary); }
+  .status-available { color: var(--text-tertiary); }
+
+  /* ─── DETAIL PANEL ─── */
+  .detail-panel {
+    width: var(--detail-w);
+    border-left: 1px solid var(--border);
+    background: var(--bg-surface);
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .detail-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .detail-header .org-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-green);
+    margin-bottom: 4px;
+  }
+  .detail-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+  .detail-header .detail-desc {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    font-family: 'Newsreader', serif;
+    font-style: italic;
+  }
+
+  .detail-actions {
+    display: flex;
+    gap: 8px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .detail-actions .toolbar-btn { flex: 1; justify-content: center; }
+
+  .detail-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .detail-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 12px;
+  }
+
+  .spec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .spec-item {
+    padding: 10px 12px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+  }
+  .spec-label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-bottom: 3px;
+    font-weight: 500;
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  /* Memory Fit Bar */
+  .memory-fit {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+  }
+  .memory-fit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .memory-fit-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .memory-fit-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-green);
+    font-weight: 600;
+  }
+  .memory-bar {
+    height: 6px;
+    background: var(--bg-active);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .memory-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .memory-bar-fill.green { background: var(--accent-green); }
+  .memory-bar-fill.amber { background: var(--accent-amber); }
+  .memory-bar-fill.red { background: var(--accent-red); }
+  .memory-segments {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-tertiary);
+  }
+
+  /* Compatibility Badges */
+  .compat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .compat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .compat-check {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .compat-check.pass { color: var(--accent-green); }
+  .compat-check.warn { color: var(--accent-amber); }
+  .compat-check.fail { color: var(--accent-red); }
+
+  /* Benchmark Sparklines */
+  .bench-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .bench-row:last-child { border-bottom: none; }
+  .bench-name {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .bench-bar-track {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-active);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bench-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent-green);
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .bench-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    width: 42px;
+    text-align: right;
+  }
+
+  /* ─── BOTTOM STATUS BAR ─── */
+  .statusbar {
+    height: 28px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+  }
+  .statusbar .status-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--border);
+  }
+
+  /* ─── GPU UTILIZATION MINI CHART ─── */
+  .gpu-mini-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 20px;
+  }
+  .gpu-mini-chart .bar {
+    width: 3px;
+    background: var(--accent-green);
+    border-radius: 1px 1px 0 0;
+    opacity: 0.6;
+    animation: gpu-bar 2s ease-in-out infinite;
+  }
+  @keyframes gpu-bar {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.9; }
+  }
+
+  /* ─── TAG PILLS ─── */
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .tag {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tag-arch { background: var(--accent-blue-dim); color: var(--accent-blue); }
+  .tag-quant { background: var(--accent-green-dim); color: var(--accent-green); }
+  .tag-use { background: var(--accent-purple-dim); color: var(--accent-purple); }
+  .tag-org { background: var(--accent-amber-dim); color: var(--accent-amber); }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+  /* ─── DATASET TAB PREVIEW ─── */
+  .dataset-preview {
+    padding: 12px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.6;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .dataset-preview .key { color: var(--accent-cyan); }
+  .dataset-preview .str { color: var(--accent-green); }
+  .dataset-preview .num { color: var(--accent-amber); }
+  .dataset-preview .comment { color: var(--text-tertiary); }
+
+  /* ─── SECTION TABS ─── */
+  .detail-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 20px;
+  }
+  .detail-tab {
+    padding: 10px 14px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .detail-tab:hover { color: var(--text-secondary); }
+  .detail-tab.active {
+    color: var(--accent-green);
+    border-bottom-color: var(--accent-green);
+  }
+
+  /* ─── TRAINING CONFIG MINI ─── */
+  .config-block {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+  .config-block .ck { color: var(--accent-cyan); }
+  .config-block .cv { color: var(--accent-green); }
+  .config-block .cc { color: var(--text-tertiary); font-style: italic; }
+
+  /* ─── ANIMATIONS ─── */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .model-row { animation: fade-in 0.3s ease both; }
+  .model-row:nth-child(1) { animation-delay: 0.02s; }
+  .model-row:nth-child(2) { animation-delay: 0.04s; }
+  .model-row:nth-child(3) { animation-delay: 0.06s; }
+  .model-row:nth-child(4) { animation-delay: 0.08s; }
+  .model-row:nth-child(5) { animation-delay: 0.10s; }
+  .model-row:nth-child(6) { animation-delay: 0.12s; }
+  .model-row:nth-child(7) { animation-delay: 0.14s; }
+  .model-row:nth-child(8) { animation-delay: 0.16s; }
+  .model-row:nth-child(9) { animation-delay: 0.18s; }
+
+  /* ─── THERMAL BADGE ─── */
+  .thermal {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .thermal-bar {
+    width: 40px; height: 4px;
+    background: var(--bg-active);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .thermal-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent-green), var(--accent-amber));
+    width: 42%;
+  }
+</style>
+</head>
+<body>
+
+<div class="window">
+
+  <!-- ═══ TITLEBAR ═══ -->
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <span class="tl-close"></span>
+      <span class="tl-minimize"></span>
+      <span class="tl-maximize"></span>
+    </div>
+    <span class="titlebar-title">Spark Control</span>
+    <div class="titlebar-badge">
+      <div class="dot"></div>
+      <span>DGX Spark · 192.168.1.42</span>
+    </div>
+    <div class="spark-stats">
+      <span>GPU <span class="stat-val">23%</span></span>
+      <span>MEM <span class="stat-val">41.2 / 128 GB</span></span>
+      <span>TEMP <span class="stat-val">52°C</span></span>
+      <span>PWR <span class="stat-val">68W</span></span>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- ═══ SIDEBAR ═══ -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Library</div>
+        <div class="nav-item active">
+          <span class="icon">◆</span> Models <span class="count">14</span>
+        </div>
+        <div class="nav-item">
+          <span class="icon">◇</span> Datasets <span class="count">8</span>
+        </div>
+        <div class="nav-item">
+          <span class="icon">▣</span> Checkpoints <span class="count">23</span>
+        </div>
+        <div class="nav-item">
+          <span class="icon">◈</span> LoRA Adapters <span class="count">6</span>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Compute</div>
+        <div class="nav-item">
+          <span class="icon">▶</span> Inference Server
+        </div>
+        <div class="nav-item">
+          <span class="icon">⟳</span> Training Jobs <span class="count">1</span>
+        </div>
+        <div class="nav-item">
+          <span class="icon">◎</span> Evaluations
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Network</div>
+        <div class="nav-item">
+          <span class="icon">⬡</span> Cluster (2× Spark)
+        </div>
+        <div class="nav-item">
+          <span class="icon">↕</span> S3 Sync
+        </div>
+        <div class="nav-item">
+          <span class="icon">⬢</span> HF Hub Pull
+        </div>
+      </div>
+
+      <!-- Spark Identity Card -->
+      <div class="spark-card">
+        <div class="device-name">DGX Spark #1</div>
+        <div class="device-chip">GB10 Grace Blackwell · NVFP4</div>
+        <div class="device-stats">
+          <div class="ds"><strong>128 GB</strong>Unified LPDDR5x</div>
+          <div class="ds"><strong>1 PFLOP</strong>FP4 Sparse</div>
+          <div class="ds"><strong>4 TB</strong>NVMe SSD</div>
+          <div class="ds"><strong>273 GB/s</strong>Mem BW</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ MAIN ═══ -->
+    <div class="main">
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="search-icon">⌕</span>
+          <input type="text" placeholder="Search models, datasets, checkpoints..." />
+          <span class="shortcut">⌘K</span>
+        </div>
+        <button class="toolbar-btn">↓ Pull</button>
+        <button class="toolbar-btn">⇅ Import GGUF</button>
+        <button class="toolbar-btn primary">▶ Load</button>
+        <div class="view-toggle">
+          <button class="active">☰</button>
+          <button>⊞</button>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="content-body">
+        <div class="model-list">
+          <div class="list-header">
+            <span>Model</span>
+            <span>Size</span>
+            <span>Quantization</span>
+            <span>Memory Fit</span>
+            <span>Status</span>
+          </div>
+
+          <!-- Row 1 — selected -->
+          <div class="model-row selected">
+            <div class="model-name-cell">
+              <div class="model-icon gguf">◆</div>
+              <div>
+                <div class="model-name">INTELLECT-3-MoE</div>
+                <div class="model-org">Prime Intellect · 100B+ MoE</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">103B</div>
+            <div><span class="quant-badge quant-fp4">FP4</span></div>
+            <div class="model-meta-cell">52 GB</div>
+            <div class="status-indicator status-loaded"><div class="status-dot"></div> Loaded</div>
+          </div>
+
+          <!-- Row 2 -->
+          <div class="model-row">
+            <div class="model-name-cell">
+              <div class="model-icon safetensors">◆</div>
+              <div>
+                <div class="model-name">Hermes-3-70B</div>
+                <div class="model-org">Nous Research · Llama 3.1</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">70B</div>
+            <div><span class="quant-badge quant-fp8">FP8</span></div>
+            <div class="model-meta-cell">72 GB</div>
+            <div class="status-indicator status-cached"><div class="status-dot"></div> Cached</div>
+          </div>
+
+          <!-- Row 3 -->
+          <div class="model-row">
+            <div class="model-name-cell">
+              <div class="model-icon gguf">◆</div>
+              <div>
+                <div class="model-name">NousCoder-14B</div>
+                <div class="model-org">Nous Research · Qwen3-14B RL</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">14B</div>
+            <div><span class="quant-badge quant-fp4">FP4</span></div>
+            <div class="model-meta-cell">8.2 GB</div>
+            <div class="status-indicator status-cached"><div class="status-dot"></div> Cached</div>
+          </div>
+
+          <!-- Row 4 -->
+          <div class="model-row">
+            <div class="model-name-cell">
+              <div class="model-icon safetensors">◆</div>
+              <div>
+                <div class="model-name">Llama-3.3-70B-Instruct</div>
+                <div class="model-org">Meta · Llama 3.3</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">70B</div>
+            <div><span class="quant-badge quant-q4">Q4_K_M</span></div>
+            <div class="model-meta-cell">38 GB</div>
+            <div class="status-indicator status-available"><div class="status-dot"></div> On disk</div>
+          </div>
+
+          <!-- Row 5 -->
+          <div class="model-row">
+            <div class="model-name-cell">
+              <div class="model-icon safetensors">◆</div>
+              <div>
+                <div class="model-name">GPT-OSS-120B</div>
+                <div class="model-org">NVIDIA · Nemotron</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">120B</div>
+            <div><span class="quant-badge quant-fp4">FP4</span></div>
+            <div class="model-meta-cell">62 GB</div>
+            <div class="status-indicator status-available"><div class="status-dot"></div> On disk</div>
+          </div>
+
+          <!-- Row 6 -->
+          <div class="model-row">
+            <div class="model-name-cell">
+              <div class="model-icon gguf">◆</div>
+              <div>
+                <div class="model-name">DeepSeek-R1-70B</div>
+                <div class="model-org">DeepSeek · Reasoning</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">70B</div>
+            <div><span class="quant-badge quant-fp8">FP8</span></div>
+            <div class="model-meta-cell">72 GB</div>
+            <div class="status-indicator status-available"><div class="status-dot"></div> On disk</div>
+          </div>
+
+          <!-- Row 7 -->
+          <div class="model-row">
+            <div class="model-name-cell">
+              <div class="model-icon checkpoint">◆</div>
+              <div>
+                <div class="model-name">Hermes-Agent-7B</div>
+                <div class="model-org">Nous Research · Agentic</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">7B</div>
+            <div><span class="quant-badge quant-bf16">BF16</span></div>
+            <div class="model-meta-cell">14 GB</div>
+            <div class="status-indicator status-cached"><div class="status-dot"></div> Cached</div>
+          </div>
+
+          <!-- Row 8 -->
+          <div class="model-row">
+            <div class="model-name-cell">
+              <div class="model-icon dataset">◇</div>
+              <div>
+                <div class="model-name">NuminaMath-QwQ-CoT-5M</div>
+                <div class="model-org">Prime Intellect · Reasoning Traces</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">5M rows</div>
+            <div><span class="quant-badge" style="background:var(--accent-purple-dim);color:var(--accent-purple)">Parquet</span></div>
+            <div class="model-meta-cell">28 GB</div>
+            <div class="status-indicator status-available"><div class="status-dot"></div> On disk</div>
+          </div>
+
+          <!-- Row 9 -->
+          <div class="model-row">
+            <div class="model-name-cell">
+              <div class="model-icon dataset">◇</div>
+              <div>
+                <div class="model-name">Atropos-RL-24K</div>
+                <div class="model-org">Nous Research · Competitive Programming</div>
+              </div>
+            </div>
+            <div class="model-meta-cell">24K problems</div>
+            <div><span class="quant-badge" style="background:var(--accent-purple-dim);color:var(--accent-purple)">JSONL</span></div>
+            <div class="model-meta-cell">4.1 GB</div>
+            <div class="status-indicator status-available"><div class="status-dot"></div> On disk</div>
+          </div>
+        </div>
+
+        <!-- ═══ DETAIL PANEL ═══ -->
+        <div class="detail-panel">
+          <div class="detail-header">
+            <div class="org-label">Prime Intellect</div>
+            <h2>INTELLECT-3-MoE</h2>
+            <div class="detail-desc">100B+ parameter Mixture-of-Experts reasoning model. State-of-the-art on math, code, science & reasoning. Trained via decentralized RL on PRIME-RL.</div>
+            <div class="tags">
+              <span class="tag tag-arch">MoE</span>
+              <span class="tag tag-quant">NVFP4</span>
+              <span class="tag tag-use">reasoning</span>
+              <span class="tag tag-use">code</span>
+              <span class="tag tag-org">PRIME-RL</span>
+            </div>
+          </div>
+
+          <div class="detail-actions">
+            <button class="toolbar-btn primary">▶ Serve</button>
+            <button class="toolbar-btn">⊕ Fine-tune</button>
+            <button class="toolbar-btn">⟳ Update</button>
+          </div>
+
+          <div class="detail-tabs">
+            <div class="detail-tab active">Specs</div>
+            <div class="detail-tab">Benchmarks</div>
+            <div class="detail-tab">Config</div>
+            <div class="detail-tab">Files</div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Architecture</div>
+            <div class="spec-grid">
+              <div class="spec-item">
+                <div class="spec-label">Parameters</div>
+                <div class="spec-value">103B</div>
+              </div>
+              <div class="spec-item">
+                <div class="spec-label">Active Params</div>
+                <div class="spec-value">14B</div>
+              </div>
+              <div class="spec-item">
+                <div class="spec-label">Experts</div>
+                <div class="spec-value">64 / 8</div>
+              </div>
+              <div class="spec-item">
+                <div class="spec-label">Context</div>
+                <div class="spec-value">128K</div>
+              </div>
+              <div class="spec-item">
+                <div class="spec-label">Vocab Size</div>
+                <div class="spec-value">152K</div>
+              </div>
+              <div class="spec-item">
+                <div class="spec-label">Layers</div>
+                <div class="spec-value">64</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Memory Fit · GB10</div>
+            <div class="memory-fit">
+              <div class="memory-fit-header">
+                <span class="memory-fit-label">Model + KV Cache (8K ctx)</span>
+                <span class="memory-fit-value">52 / 128 GB · 40.6%</span>
+              </div>
+              <div class="memory-bar">
+                <div class="memory-bar-fill green" style="width: 40.6%"></div>
+              </div>
+              <div class="memory-segments">
+                <span>0</span>
+                <span>32</span>
+                <span>64</span>
+                <span>96</span>
+                <span>128 GB</span>
+              </div>
+            </div>
+            <div class="memory-fit" style="margin-top:8px">
+              <div class="memory-fit-header">
+                <span class="memory-fit-label">Fine-tune (LoRA r=16, bs=4)</span>
+                <span class="memory-fit-value" style="color:var(--accent-amber)">89 / 128 GB · 69.5%</span>
+              </div>
+              <div class="memory-bar">
+                <div class="memory-bar-fill amber" style="width: 69.5%"></div>
+              </div>
+              <div class="memory-segments">
+                <span>0</span>
+                <span>32</span>
+                <span>64</span>
+                <span>96</span>
+                <span>128 GB</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Spark Compatibility</div>
+            <div class="compat-list">
+              <div class="compat-item">
+                <span>FP4 Tensor Cores</span>
+                <span class="compat-check pass">✓ native</span>
+              </div>
+              <div class="compat-item">
+                <span>Memory Capacity</span>
+                <span class="compat-check pass">✓ 52/128 GB</span>
+              </div>
+              <div class="compat-item">
+                <span>Bandwidth Bound</span>
+                <span class="compat-check warn">⚠ 273 GB/s</span>
+              </div>
+              <div class="compat-item">
+                <span>2× Spark Cluster</span>
+                <span class="compat-check pass">✓ FP8 capable</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Benchmarks</div>
+            <div class="bench-row">
+              <span class="bench-name">MATH-500</span>
+              <div class="bench-bar-track"><div class="bench-bar-fill" style="width:91%"></div></div>
+              <span class="bench-score">91.2</span>
+            </div>
+            <div class="bench-row">
+              <span class="bench-name">LiveCode v6</span>
+              <div class="bench-bar-track"><div class="bench-bar-fill" style="width:74%"></div></div>
+              <span class="bench-score">74.1</span>
+            </div>
+            <div class="bench-row">
+              <span class="bench-name">GPQA</span>
+              <div class="bench-bar-track"><div class="bench-bar-fill" style="width:68%"></div></div>
+              <span class="bench-score">68.4</span>
+            </div>
+            <div class="bench-row">
+              <span class="bench-name">MMLU-Pro</span>
+              <div class="bench-bar-track"><div class="bench-bar-fill" style="width:82%"></div></div>
+              <span class="bench-score">82.7</span>
+            </div>
+            <div class="bench-row">
+              <span class="bench-name">ARC-C</span>
+              <div class="bench-bar-track"><div class="bench-bar-fill" style="width:95%"></div></div>
+              <span class="bench-score">95.3</span>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Quick Serve Config</div>
+            <div class="config-block">
+<span class="cc"># spark-control auto-generated</span>
+<span class="ck">backend</span>: <span class="cv">sglang</span>
+<span class="ck">model</span>: <span class="cv">/models/intellect-3-moe-fp4</span>
+<span class="ck">quantization</span>: <span class="cv">fp4</span>
+<span class="ck">tensor_parallel</span>: <span class="cv">1</span>
+<span class="ck">max_model_len</span>: <span class="cv">8192</span>
+<span class="ck">gpu_memory_utilization</span>: <span class="cv">0.85</span>
+<span class="ck">api_compat</span>: <span class="cv">openai</span>
+<span class="ck">port</span>: <span class="cv">8000</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /content-body -->
+    </div><!-- /main -->
+  </div><!-- /layout -->
+
+  <!-- ═══ STATUS BAR ═══ -->
+  <div class="statusbar">
+    <span>INTELLECT-3-MoE loaded · /v1/chat/completions on :8000</span>
+    <span class="status-sep"></span>
+    <span>14 models · 8 datasets · 23 checkpoints</span>
+    <span class="status-sep"></span>
+    <span>SSD: 1.8 / 4.0 TB</span>
+    <span class="status-sep"></span>
+    <div class="thermal">
+      <span>52°C</span>
+      <div class="thermal-bar"><div class="thermal-fill"></div></div>
+    </div>
+    <span class="status-sep"></span>
+    <div class="gpu-mini-chart">
+      <div class="bar" style="height:8px;animation-delay:0s"></div>
+      <div class="bar" style="height:12px;animation-delay:0.1s"></div>
+      <div class="bar" style="height:6px;animation-delay:0.2s"></div>
+      <div class="bar" style="height:14px;animation-delay:0.3s"></div>
+      <div class="bar" style="height:10px;animation-delay:0.4s"></div>
+      <div class="bar" style="height:16px;animation-delay:0.5s"></div>
+      <div class="bar" style="height:8px;animation-delay:0.6s"></div>
+      <div class="bar" style="height:11px;animation-delay:0.7s"></div>
+      <div class="bar" style="height:14px;animation-delay:0.8s"></div>
+      <div class="bar" style="height:7px;animation-delay:0.9s"></div>
+    </div>
+    <span>23% GPU</span>
+    <span style="margin-left:auto">Spark Control v0.1.0</span>
+  </div>
+
+</div>
+
+</body>
+</html>

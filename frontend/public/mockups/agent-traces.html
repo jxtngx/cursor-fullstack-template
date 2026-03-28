@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>agent-traces — DGX Mode</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #0a0a0c;
+    --bg-surface: #111114;
+    --bg-elevated: #18181c;
+    --bg-hover: #1f1f25;
+    --bg-active: #28282f;
+    --border: #242430;
+    --border-subtle: #1c1c26;
+    --text-primary: #e8e6e3;
+    --text-secondary: #908e99;
+    --text-tertiary: #5a5868;
+    --text-dim: #3d3b48;
+    --green: #76b900;
+    --green-dim: #76b90028;
+    --green-glow: #76b90010;
+    --amber: #f59e0b;
+    --amber-dim: #f59e0b1e;
+    --red: #ef4444;
+    --red-dim: #ef44441e;
+    --blue: #60a5fa;
+    --blue-dim: #60a5fa1e;
+    --purple: #a78bfa;
+    --purple-dim: #a78bfa1e;
+    --cyan: #22d3ee;
+    --cyan-dim: #22d3ee1e;
+    --rose: #fb7185;
+    --rose-dim: #fb71851e;
+    --teal: #2dd4bf;
+    --teal-dim: #2dd4bf1e;
+    --orange: #fb923c;
+    --orange-dim: #fb923c1e;
+    /* span type colors */
+    --span-agent: #76b900;
+    --span-llm: #60a5fa;
+    --span-tool: #f59e0b;
+    --span-retrieval: #a78bfa;
+    --span-chain: #22d3ee;
+    --span-embed: #fb7185;
+    --span-parse: #2dd4bf;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --sidebar-w: 300px;
+    --detail-w: 400px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Instrument Sans', -apple-system, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .window { height:100vh; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+
+  /* ─── TITLEBAR ─── */
+  .titlebar {
+    height: 48px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 16px; gap: 12px;
+    flex-shrink: 0;
+  }
+  .traffic-lights { display:flex; gap:8px; margin-right:8px; }
+  .traffic-lights span { width:12px; height:12px; border-radius:50%; }
+  .tl-close { background:#ff5f57; }
+  .tl-min { background:#febc2e; }
+  .tl-max { background:#28c840; }
+  .titlebar-logo {
+    display:flex; align-items:center; gap:8px;
+    font-weight:700; font-size:13px; color:var(--text-secondary);
+  }
+  .titlebar-logo .mark {
+    width:20px; height:20px;
+    background: var(--green);
+    border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#000; font-weight:800;
+  }
+  .titlebar-nav {
+    display:flex; gap:2px; margin-left:24px;
+    background:var(--bg-elevated); border-radius:var(--radius-sm);
+    padding:2px; border:1px solid var(--border-subtle);
+  }
+  .titlebar-nav button {
+    padding:5px 14px; font-size:12px; font-weight:600; font-family:inherit;
+    background:none; border:none; border-radius:4px;
+    color:var(--text-tertiary); cursor:pointer; transition:all 0.15s;
+  }
+  .titlebar-nav button:hover { color:var(--text-secondary); }
+  .titlebar-nav button.active { background:var(--bg-active); color:var(--text-primary); }
+
+  .titlebar-right { margin-left:auto; display:flex; align-items:center; gap:12px; }
+  .backend-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    padding:3px 8px; border-radius:10px;
+    background:var(--green-dim); color:var(--green);
+    border:1px solid var(--green)22;
+  }
+  .titlebar-env {
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-tertiary);
+  }
+
+  /* ─── LAYOUT ─── */
+  .layout { display:flex; flex:1; overflow:hidden; }
+
+  /* ─── TRACE LIST SIDEBAR ─── */
+  .trace-list-panel {
+    width: var(--sidebar-w);
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    flex-shrink: 0;
+  }
+  .trace-list-header {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .trace-list-header h3 {
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+  }
+  .trace-search {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .trace-search input {
+    background:none; border:none; outline:none;
+    color:var(--text-primary); font-family:inherit; font-size:12px; width:100%;
+  }
+  .trace-search input::placeholder { color:var(--text-dim); }
+  .trace-search .shortcut {
+    font-family:'JetBrains Mono',monospace; font-size:9px;
+    padding:2px 4px; border-radius:3px;
+    background:var(--bg-active); color:var(--text-dim);
+  }
+
+  .trace-filters {
+    display: flex; gap: 4px; padding: 0 12px 8px;
+  }
+  .trace-filter {
+    padding: 3px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-dim); cursor: pointer; transition: all 0.12s;
+  }
+  .trace-filter:hover { color: var(--text-tertiary); }
+  .trace-filter.active { border-color: var(--green)44; color: var(--green); background: var(--green-dim); }
+
+  .trace-list {
+    flex: 1; overflow-y: auto;
+    padding: 4px 6px;
+  }
+  .trace-item {
+    padding: 10px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer; transition: all 0.12s;
+    border: 1px solid transparent;
+    margin-bottom: 2px;
+  }
+  .trace-item:hover { background: var(--bg-hover); }
+  .trace-item.active {
+    background: var(--green-glow);
+    border-color: var(--green)28;
+  }
+  .trace-item-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .trace-item-name {
+    font-size: 12.5px; font-weight: 600; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 180px;
+  }
+  .trace-item-time {
+    font-family:'JetBrains Mono',monospace;
+    font-size: 10px; color: var(--text-dim);
+  }
+  .trace-item-meta {
+    display: flex; align-items: center; gap: 8px;
+    font-family:'JetBrains Mono',monospace; font-size: 10px;
+  }
+  .trace-item-meta .tim { color: var(--text-tertiary); }
+  .trace-item-meta .tok { color: var(--blue); }
+  .trace-item-meta .cost { color: var(--amber); }
+  .trace-item-meta .spans { color: var(--text-dim); }
+  .trace-item-status {
+    display: inline-block;
+    width: 5px; height: 5px; border-radius: 50%;
+    margin-right: 6px;
+  }
+  .trace-item-status.ok { background: var(--green); }
+  .trace-item-status.err { background: var(--red); }
+  .trace-item-status.slow { background: var(--amber); }
+
+  .trace-list-footer {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border-subtle);
+    font-family:'JetBrains Mono',monospace;
+    font-size: 9.5px; color: var(--text-dim);
+    display: flex; justify-content: space-between;
+  }
+
+  /* ─── MAIN WATERFALL ─── */
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* Trace header bar */
+  .trace-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0;
+    background: var(--bg-surface);
+  }
+  .trace-header h2 {
+    font-size: 14px; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .trace-header .trace-id {
+    font-family:'JetBrains Mono',monospace;
+    font-size: 10.5px; color: var(--text-dim);
+    padding: 3px 8px; background: var(--bg-elevated);
+    border-radius: 4px; border: 1px solid var(--border-subtle);
+  }
+  .trace-summary-stats {
+    display: flex; gap: 16px; margin-left: auto;
+    font-family:'JetBrains Mono',monospace; font-size: 11px;
+  }
+  .trace-summary-stats .tss {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .trace-summary-stats .tss-label { color: var(--text-dim); }
+  .trace-summary-stats .tss-val { font-weight: 600; }
+
+  /* Waterfall timeline ruler */
+  .waterfall-ruler {
+    height: 28px;
+    padding: 0 16px 0 220px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: flex-end;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .ruler-marks {
+    display: flex; justify-content: space-between; width: 100%;
+    font-family:'JetBrains Mono',monospace; font-size: 9px;
+    color: var(--text-dim); padding-bottom: 4px;
+  }
+
+  /* Waterfall body */
+  .waterfall-body {
+    flex: 1; overflow-y: auto;
+    display: flex;
+  }
+  .waterfall-spans {
+    flex: 1;
+    padding: 0;
+  }
+
+  /* ─── SPAN ROW ─── */
+  .span-row {
+    display: flex;
+    align-items: center;
+    height: 38px;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: background 0.1s;
+    animation: span-in 0.3s ease both;
+  }
+  .span-row:hover { background: var(--bg-elevated); }
+  .span-row.selected { background: var(--green-glow); }
+  @keyframes span-in {
+    from { opacity:0; transform:translateX(-6px); }
+    to { opacity:1; transform:translateX(0); }
+  }
+  .span-row:nth-child(1) { animation-delay:0.02s; }
+  .span-row:nth-child(2) { animation-delay:0.04s; }
+  .span-row:nth-child(3) { animation-delay:0.06s; }
+  .span-row:nth-child(4) { animation-delay:0.08s; }
+  .span-row:nth-child(5) { animation-delay:0.10s; }
+  .span-row:nth-child(6) { animation-delay:0.12s; }
+  .span-row:nth-child(7) { animation-delay:0.14s; }
+  .span-row:nth-child(8) { animation-delay:0.16s; }
+  .span-row:nth-child(9) { animation-delay:0.18s; }
+  .span-row:nth-child(10) { animation-delay:0.20s; }
+  .span-row:nth-child(11) { animation-delay:0.22s; }
+  .span-row:nth-child(12) { animation-delay:0.24s; }
+
+  /* Span label area (left side) */
+  .span-label {
+    width: 220px;
+    flex-shrink: 0;
+    padding: 0 10px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+  }
+  .span-indent {
+    flex-shrink: 0;
+  }
+  .span-tree-line {
+    width: 1px;
+    height: 38px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .span-connector {
+    display: flex; align-items: center;
+    flex-shrink: 0;
+  }
+  .span-connector-vert {
+    width: 1px;
+    height: 100%;
+    position: absolute;
+    left: 0; top: 0;
+  }
+  .span-type-badge {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family:'JetBrains Mono',monospace;
+    font-size: 9px; font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .span-type-badge.agent { background: var(--green-dim); color: var(--span-agent); }
+  .span-type-badge.llm { background: var(--blue-dim); color: var(--span-llm); }
+  .span-type-badge.tool { background: var(--amber-dim); color: var(--span-tool); }
+  .span-type-badge.retrieval { background: var(--purple-dim); color: var(--span-retrieval); }
+  .span-type-badge.chain { background: var(--cyan-dim); color: var(--span-chain); }
+  .span-type-badge.embed { background: var(--rose-dim); color: var(--span-embed); }
+  .span-type-badge.parse { background: var(--teal-dim); color: var(--span-parse); }
+
+  .span-name {
+    font-size: 11.5px; font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .span-name.dim { color: var(--text-secondary); font-weight: 500; }
+
+  /* Span bar area (right side — waterfall) */
+  .span-bar-area {
+    flex: 1;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    min-width: 0;
+  }
+  .span-bar-track {
+    width: 100%;
+    height: 38px;
+    position: relative;
+  }
+  .span-bar {
+    position: absolute;
+    height: 16px;
+    top: 11px;
+    border-radius: 3px;
+    min-width: 4px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 6px;
+  }
+  .span-bar .bar-label {
+    font-family:'JetBrains Mono',monospace;
+    font-size: 9px; font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  }
+  .span-bar.agent-bar { background: var(--span-agent)44; border: 1px solid var(--span-agent)66; }
+  .span-bar.llm-bar { background: var(--span-llm)44; border: 1px solid var(--span-llm)66; }
+  .span-bar.tool-bar { background: var(--span-tool)44; border: 1px solid var(--span-tool)66; }
+  .span-bar.retrieval-bar { background: var(--span-retrieval)44; border: 1px solid var(--span-retrieval)66; }
+  .span-bar.chain-bar { background: var(--span-chain)44; border: 1px solid var(--span-chain)66; }
+  .span-bar.embed-bar { background: var(--span-embed)44; border: 1px solid var(--span-embed)66; }
+  .span-bar.parse-bar { background: var(--span-parse)44; border: 1px solid var(--span-parse)66; }
+  .span-bar.error-bar { background: var(--red)22; border: 1px solid var(--red)55; border-left: 3px solid var(--red); }
+
+  /* Span metadata on the right of the bar */
+  .span-meta {
+    position: absolute;
+    right: 0; top: 0;
+    height: 38px;
+    display: flex; align-items: center; gap: 10px;
+    padding-right: 4px;
+    font-family:'JetBrains Mono',monospace; font-size: 10px;
+  }
+  .span-meta .sm-tok { color: var(--blue); }
+  .span-meta .sm-cost { color: var(--amber); }
+  .span-meta .sm-lat { color: var(--text-tertiary); }
+  .span-meta .sm-err { color: var(--red); font-weight: 600; }
+
+  /* ─── DETAIL PANEL ─── */
+  .detail-panel {
+    width: var(--detail-w);
+    border-left: 1px solid var(--border);
+    background: var(--bg-surface);
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .detail-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .detail-header .detail-type {
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .detail-header h3 {
+    font-size: 15px; font-weight: 700;
+    letter-spacing: -0.02em; margin-bottom: 6px;
+  }
+  .detail-header .detail-span-id {
+    font-family:'JetBrains Mono',monospace;
+    font-size: 10px; color: var(--text-dim);
+  }
+
+  .detail-tabs {
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 16px;
+  }
+  .detail-tab {
+    padding: 9px 12px;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.12s;
+  }
+  .detail-tab:hover { color: var(--text-tertiary); }
+  .detail-tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+  .detail-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .detail-section-title {
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-dim); margin-bottom: 10px;
+  }
+
+  /* Stat grid */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-item {
+    padding: 8px 10px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+  }
+  .stat-label {
+    font-size: 9px; color: var(--text-dim);
+    font-weight: 600; margin-bottom: 2px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .stat-value {
+    font-family:'JetBrains Mono',monospace;
+    font-size: 13px; font-weight: 700;
+  }
+
+  /* Prompt / Response blocks */
+  .io-block {
+    margin-bottom: 8px;
+  }
+  .io-label {
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .io-label .io-arrow { font-size: 11px; }
+  .io-label.input-label { color: var(--cyan); }
+  .io-label.output-label { color: var(--green); }
+  .io-content {
+    padding: 10px 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .io-content .system-msg {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .io-content .highlight {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  /* Model config block */
+  .model-config {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .mc-row {
+    display: flex; justify-content: space-between;
+    padding: 5px 8px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  .mc-row .mc-key { color: var(--text-dim); }
+  .mc-row .mc-val {
+    font-family:'JetBrains Mono',monospace;
+    font-weight: 600; color: var(--text-secondary);
+  }
+
+  /* Tool result */
+  .tool-result {
+    padding: 10px 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-family:'JetBrains Mono',monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-height: 140px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .tool-result .tk { color: var(--cyan); }
+  .tool-result .tv { color: var(--green); }
+  .tool-result .tc { color: var(--text-dim); }
+
+  /* ─── STATUSBAR ─── */
+  .statusbar {
+    height: 26px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 14px; gap: 14px;
+    font-family:'JetBrains Mono',monospace;
+    font-size: 9.5px; color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .statusbar .sep { width:1px; height:10px; background:var(--border); }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+  /* ─── GRID LINES IN WATERFALL ─── */
+  .waterfall-grid-lines {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 16px;
+  }
+  .wg-line {
+    width: 1px;
+    height: 100%;
+    background: var(--border-subtle);
+  }
+</style>
+</head>
+<body>
+
+<div class="window">
+
+  <!-- ═══ TITLEBAR ═══ -->
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <span class="tl-close"></span>
+      <span class="tl-min"></span>
+      <span class="tl-max"></span>
+    </div>
+    <div class="titlebar-logo">
+      <div class="mark">θ</div>
+      agent-traces
+    </div>
+    <div class="titlebar-nav">
+      <button class="active">Traces</button>
+      <button>Sessions</button>
+      <button>Evals</button>
+      <button>Costs</button>
+    </div>
+    <div class="titlebar-right">
+      <span class="backend-badge">OTel → JSONL · local</span>
+      <span class="titlebar-env">~/.dgxmode/traces/</span>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- ═══ TRACE LIST SIDEBAR ═══ -->
+    <div class="trace-list-panel">
+      <div class="trace-list-header">
+        <h3>Traces · Last 24h</h3>
+        <div class="trace-search">
+          <span style="color:var(--text-dim);font-size:12px">⌕</span>
+          <input placeholder="Search traces, span names, models..." />
+          <span class="shortcut">⌘K</span>
+        </div>
+      </div>
+      <div class="trace-filters">
+        <span class="trace-filter active">All</span>
+        <span class="trace-filter">Agent</span>
+        <span class="trace-filter">LLM</span>
+        <span class="trace-filter">Tool</span>
+        <span class="trace-filter" style="border-color:var(--red)33;color:var(--red)">Errors</span>
+      </div>
+
+      <div class="trace-list">
+        <!-- Active trace -->
+        <div class="trace-item active">
+          <div class="trace-item-header">
+            <span class="trace-item-name"><span class="trace-item-status ok"></span>lab-tool-agent</span>
+            <span class="trace-item-time">2m ago</span>
+          </div>
+          <div class="trace-item-meta">
+            <span class="tim">3.2s</span>
+            <span class="tok">2,847 tok</span>
+            <span class="cost">$0.0041</span>
+            <span class="spans">12 spans</span>
+          </div>
+        </div>
+
+        <div class="trace-item">
+          <div class="trace-item-header">
+            <span class="trace-item-name"><span class="trace-item-status ok"></span>lab-tool-agent</span>
+            <span class="trace-item-time">8m ago</span>
+          </div>
+          <div class="trace-item-meta">
+            <span class="tim">2.8s</span>
+            <span class="tok">1,923 tok</span>
+            <span class="cost">$0.0029</span>
+            <span class="spans">9 spans</span>
+          </div>
+        </div>
+
+        <div class="trace-item">
+          <div class="trace-item-header">
+            <span class="trace-item-name"><span class="trace-item-status slow"></span>lab-api-fetch</span>
+            <span class="trace-item-time">14m ago</span>
+          </div>
+          <div class="trace-item-meta">
+            <span class="tim" style="color:var(--amber)">8.1s</span>
+            <span class="tok">4,201 tok</span>
+            <span class="cost">$0.0063</span>
+            <span class="spans">16 spans</span>
+          </div>
+        </div>
+
+        <div class="trace-item">
+          <div class="trace-item-header">
+            <span class="trace-item-name"><span class="trace-item-status err"></span>profiler-export</span>
+            <span class="trace-item-time">21m ago</span>
+          </div>
+          <div class="trace-item-meta">
+            <span class="tim">1.4s</span>
+            <span class="tok">412 tok</span>
+            <span class="cost" style="color:var(--red)">err</span>
+            <span class="spans">5 spans</span>
+          </div>
+        </div>
+
+        <div class="trace-item">
+          <div class="trace-item-header">
+            <span class="trace-item-name"><span class="trace-item-status ok"></span>lab-tool-agent</span>
+            <span class="trace-item-time">34m ago</span>
+          </div>
+          <div class="trace-item-meta">
+            <span class="tim">2.1s</span>
+            <span class="tok">1,547 tok</span>
+            <span class="cost">$0.0023</span>
+            <span class="spans">8 spans</span>
+          </div>
+        </div>
+
+        <div class="trace-item">
+          <div class="trace-item-header">
+            <span class="trace-item-name"><span class="trace-item-status ok"></span>embed-chunk-batch</span>
+            <span class="trace-item-time">41m ago</span>
+          </div>
+          <div class="trace-item-meta">
+            <span class="tim">0.9s</span>
+            <span class="tok">3,680 tok</span>
+            <span class="cost">$0.0004</span>
+            <span class="spans">3 spans</span>
+          </div>
+        </div>
+
+        <div class="trace-item">
+          <div class="trace-item-header">
+            <span class="trace-item-name"><span class="trace-item-status ok"></span>lab-tool-agent</span>
+            <span class="trace-item-time">58m ago</span>
+          </div>
+          <div class="trace-item-meta">
+            <span class="tim">4.6s</span>
+            <span class="tok">3,290 tok</span>
+            <span class="cost">$0.0049</span>
+            <span class="spans">14 spans</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="trace-list-footer">
+        <span>47 traces · 24h</span>
+        <span>$0.18 total</span>
+      </div>
+    </div>
+
+    <!-- ═══ WATERFALL MAIN ═══ -->
+    <div class="main">
+      <div class="trace-header">
+        <h2>lab-tool-agent</h2>
+        <span class="trace-id">trace:a8f2c91d</span>
+        <div class="trace-summary-stats">
+          <div class="tss">
+            <span class="tss-label">Duration</span>
+            <span class="tss-val" style="color:var(--text-primary)">3.2s</span>
+          </div>
+          <div class="tss">
+            <span class="tss-label">Tokens</span>
+            <span class="tss-val" style="color:var(--blue)">2,847</span>
+          </div>
+          <div class="tss">
+            <span class="tss-label">Cost</span>
+            <span class="tss-val" style="color:var(--amber)">$0.0041</span>
+          </div>
+          <div class="tss">
+            <span class="tss-label">Spans</span>
+            <span class="tss-val" style="color:var(--text-secondary)">12</span>
+          </div>
+          <div class="tss">
+            <span class="tss-label">Model</span>
+            <span class="tss-val" style="color:var(--green)">llama-3.3-70b</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ruler -->
+      <div class="waterfall-ruler">
+        <div class="ruler-marks">
+          <span>0ms</span>
+          <span>640ms</span>
+          <span>1,280ms</span>
+          <span>1,920ms</span>
+          <span>2,560ms</span>
+          <span>3,200ms</span>
+        </div>
+      </div>
+
+      <!-- Waterfall -->
+      <div class="waterfall-body">
+        <div class="waterfall-spans">
+
+          <!-- Root: agent -->
+          <div class="span-row selected">
+            <div class="span-label">
+              <span class="span-type-badge agent">agent</span>
+              <span class="span-name">lab-tool-agent</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar agent-bar" style="left:0%;width:100%">
+                  <span class="bar-label">3,200ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- L1: chain — memory budget parse -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:16px"></span>
+              <span class="span-type-badge chain">chain</span>
+              <span class="span-name dim">memory-budget-parse</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar chain-bar" style="left:0%;width:12%">
+                  <span class="bar-label">384ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- L2: llm — classify intent -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:32px"></span>
+              <span class="span-type-badge llm">llm</span>
+              <span class="span-name">classify-intent</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar llm-bar" style="left:1%;width:10%">
+                  <span class="bar-label">320ms</span>
+                </div>
+              </div>
+              <div class="span-meta">
+                <span class="sm-tok">142 tok</span>
+                <span class="sm-cost">$0.0002</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- L1: retrieval — repo RAG -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:16px"></span>
+              <span class="span-type-badge retrieval">rag</span>
+              <span class="span-name">repo-rag-retrieval</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar retrieval-bar" style="left:12%;width:22%">
+                  <span class="bar-label">704ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- L2: embed — query embedding -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:32px"></span>
+              <span class="span-type-badge embed">embed</span>
+              <span class="span-name dim">query-embedding</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar embed-bar" style="left:12%;width:4%">
+                  <span class="bar-label">128ms</span>
+                </div>
+              </div>
+              <div class="span-meta">
+                <span class="sm-tok">24 tok</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- L2: tool — pgvector search -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:32px"></span>
+              <span class="span-type-badge tool">tool</span>
+              <span class="span-name">pgvector-search</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar tool-bar" style="left:16%;width:14%">
+                  <span class="bar-label">448ms</span>
+                </div>
+              </div>
+              <div class="span-meta">
+                <span class="sm-lat">8 results</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- L2: parse — chunk ranking -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:32px"></span>
+              <span class="span-type-badge parse">rank</span>
+              <span class="span-name dim">rerank-chunks</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar parse-bar" style="left:30%;width:4%">
+                  <span class="bar-label">128ms</span>
+                </div>
+              </div>
+              <div class="span-meta">
+                <span class="sm-lat">8 → 3</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- L1: tool — lab API fetch -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:16px"></span>
+              <span class="span-type-badge tool">tool</span>
+              <span class="span-name">lab-api-fetch</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar tool-bar" style="left:34%;width:9%">
+                  <span class="bar-label">288ms</span>
+                </div>
+              </div>
+              <div class="span-meta">
+                <span class="sm-lat">3 sources</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- L1: llm — generate response (the big one) -->
+          <div class="span-row selected">
+            <div class="span-label">
+              <span class="span-indent" style="width:16px"></span>
+              <span class="span-type-badge llm">llm</span>
+              <span class="span-name">generate-response</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar llm-bar" style="left:43%;width:50%">
+                  <span class="bar-label">1,600ms</span>
+                </div>
+              </div>
+              <div class="span-meta">
+                <span class="sm-tok">2,340 tok</span>
+                <span class="sm-cost">$0.0035</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- L1: parse — format output -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:16px"></span>
+              <span class="span-type-badge parse">parse</span>
+              <span class="span-name dim">format-response</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar parse-bar" style="left:93%;width:3%">
+                  <span class="bar-label">96ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- L1: tool — grounding check -->
+          <div class="span-row">
+            <div class="span-label">
+              <span class="span-indent" style="width:16px"></span>
+              <span class="span-type-badge tool">tool</span>
+              <span class="span-name dim">verify-grounding</span>
+            </div>
+            <div class="span-bar-area">
+              <div class="span-bar-track">
+                <div class="span-bar tool-bar" style="left:96%;width:4%">
+                  <span class="bar-label">128ms</span>
+                </div>
+              </div>
+              <div class="span-meta">
+                <span class="sm-lat" style="color:var(--green)">4/4 PASS</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ DETAIL PANEL ═══ -->
+    <div class="detail-panel">
+      <div class="detail-header">
+        <div class="detail-type" style="color:var(--span-llm)">LLM Span</div>
+        <h3>generate-response</h3>
+        <div class="detail-span-id">span:e4b19a2f · parent:a8f2c91d</div>
+      </div>
+
+      <div class="detail-tabs">
+        <div class="detail-tab active">I/O</div>
+        <div class="detail-tab">Model</div>
+        <div class="detail-tab">Tokens</div>
+        <div class="detail-tab">Raw</div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Metrics</div>
+        <div class="stat-grid">
+          <div class="stat-item">
+            <div class="stat-label">Latency</div>
+            <div class="stat-value" style="color:var(--text-primary)">1.6s</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Tokens In</div>
+            <div class="stat-value" style="color:var(--cyan)">1,847</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Tokens Out</div>
+            <div class="stat-value" style="color:var(--green)">493</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Cost</div>
+            <div class="stat-value" style="color:var(--amber)">$0.0035</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Tok/s</div>
+            <div class="stat-value" style="color:var(--text-secondary)">308</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">TTFT</div>
+            <div class="stat-value" style="color:var(--text-secondary)">142ms</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Model Config</div>
+        <div class="model-config">
+          <div class="mc-row">
+            <span class="mc-key">model</span>
+            <span class="mc-val" style="color:var(--green)">llama-3.3-70b</span>
+          </div>
+          <div class="mc-row">
+            <span class="mc-key">backend</span>
+            <span class="mc-val">llama.cpp</span>
+          </div>
+          <div class="mc-row">
+            <span class="mc-key">temperature</span>
+            <span class="mc-val">0.3</span>
+          </div>
+          <div class="mc-row">
+            <span class="mc-key">max_tokens</span>
+            <span class="mc-val">1024</span>
+          </div>
+          <div class="mc-row">
+            <span class="mc-key">quant</span>
+            <span class="mc-val" style="color:var(--green)">FP4</span>
+          </div>
+          <div class="mc-row">
+            <span class="mc-key">ctx_window</span>
+            <span class="mc-val">8192</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Input</div>
+        <div class="io-block">
+          <div class="io-label input-label"><span class="io-arrow">→</span> System + User Messages</div>
+          <div class="io-content"><span class="system-msg">[system] You are a tool-using agent on DGX Spark. Ground answers in retrieved context, traces, and repo paths. Cite span IDs and sources when retrieval or tools are used. Prefer dense technical output; no filler.</span>
+
+<span class="highlight">[user] INTELLECT-3-MoE FP4 is loaded on my Spark; nvtop shows about 52/128 GB at idle after weights. How much headroom is left for a 32k context prefill batch, and does KV or weights dominate first?</span>
+
+<span class="system-msg">[context: 4 chunks retrieved, 2 run configs]</span>
+  configs/intellect-3-moe-fp4.yaml — max_seq_len: 131072, tensor_parallel: 1, kv_cache_dtype: fp8
+  docs/spark-memory.md — unified 128 GB pool; note GB10 bandwidth vs HBM-class rigs
+  experiments/bench-a8f2/moe-spark.json — prefill tok/s vs batch for MoE FP4 on Spark
+  nous-docs/hermes-70b-kv.md — KV sizing heuristics (compare dense 70B vs MoE active params)
+
+<span class="system-msg">[lab notes]</span>
+  Prime Intellect Lab: treat published run configs as authoritative for MoE expert routing overhead
+  GPU MODE thread #4821: measured KV growth vs seq_len on GB10 (community numbers, verify locally)</div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Output</div>
+        <div class="io-block">
+          <div class="io-label output-label"><span class="io-arrow">←</span> Assistant Response · 493 tokens</div>
+          <div class="io-content">At idle after load, the ~52 GB you see is overwhelmingly static weights (MoE + FP4 weights and allocator slack), not KV. KV is allocated with context; it scales roughly linearly with batch and sequence length once you start prefilling.
+
+<span class="highlight">Back-of-envelope for 32k prefill on one batch:</span>
+
+Use your measured bytes/token from experiments/bench-a8f2 or run a short cudaMemGetInfo sweep after a single long prefill. With FP8 KV in the retrieved config, KV is often the crossing point before you exhaust 128 GB unified memory, but MoE active-parameter count sets attention FLOPs and effective residency.
+
+Order of operations: weights fixed (~52 GB here) plus KV growth as prefill advances, plus activation peaks during the long matmul stack. On Spark, bandwidth to unified memory matters as much as raw capacity — treat 273 GB/s as the ceiling called out in dgxmode hardware notes when you sanity-check sustained prefill.
+
+<span class="system-msg">[4 sources grounded PASS]</span></div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Token Breakdown</div>
+        <div style="display:flex;gap:4px;align-items:flex-end;height:40px;padding-top:4px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+            <div style="background:var(--text-dim);height:8px;width:100%;border-radius:2px"></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-dim)">system 312</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+            <div style="background:var(--cyan);height:6px;width:100%;border-radius:2px;opacity:0.6"></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--cyan)">user 48</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:2.5">
+            <div style="background:var(--purple);height:30px;width:100%;border-radius:2px;opacity:0.5"></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--purple)">context 1,487</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+            <div style="background:var(--green);height:16px;width:100%;border-radius:2px;opacity:0.6"></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--green)">output 493</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /layout -->
+
+  <!-- ═══ STATUSBAR ═══ -->
+  <div class="statusbar">
+    <span>trace:a8f2c91d · lab-tool-agent · 12 spans · 3.2s</span>
+    <span class="sep"></span>
+    <span>OTel SDK → JSONL · ~/.dgxmode/traces/</span>
+    <span class="sep"></span>
+    <span>model: llama-3.3-70b (llama.cpp · FP4 · DGX Spark)</span>
+    <span class="sep"></span>
+    <span>session: user_fe8a12 · 3 traces</span>
+    <span style="margin-left:auto">agent-traces v0.1.0 · dgxmode.com</span>
+  </div>
+
+</div>
+
+</body>
+</html>

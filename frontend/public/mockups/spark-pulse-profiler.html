@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spark Pulse — Profiler</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #09090b;
+    --bg-surface: #0f0f12;
+    --bg-elevated: #161619;
+    --bg-hover: #1c1c21;
+    --bg-active: #24242b;
+    --border: #222230;
+    --border-subtle: #1a1a24;
+    --text-primary: #e8e6e3;
+    --text-secondary: #8b8993;
+    --text-tertiary: #5a5868;
+    --text-dim: #3a3848;
+    --green: #76b900;
+    --green-dim: #76b90020;
+    --green-bright: #8dd100;
+    --amber: #f59e0b;
+    --amber-dim: #f59e0b18;
+    --red: #ef4444;
+    --red-dim: #ef444418;
+    --blue: #60a5fa;
+    --blue-dim: #60a5fa18;
+    --purple: #a78bfa;
+    --purple-dim: #a78bfa18;
+    --cyan: #22d3ee;
+    --cyan-dim: #22d3ee18;
+    --rose: #fb7185;
+    --rose-dim: #fb718518;
+    --teal: #2dd4bf;
+    --orange: #fb923c;
+    /* kernel colors */
+    --k-gemm: #76b900;
+    --k-attn: #f59e0b;
+    --k-norm: #22d3ee;
+    --k-act: #a78bfa;
+    --k-embed: #fb7185;
+    --k-sample: #2dd4bf;
+    --k-moe: #fb923c;
+    --k-memcpy: #60a5fa;
+    --k-idle: #24242b;
+    --k-sync: #ef4444;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --lane-h: 28px;
+    --label-w: 160px;
+    --detail-w: 360px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Instrument Sans', -apple-system, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    height: 100vh; overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  .window { height:100vh; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+
+  /* ═══ TITLEBAR ═══ */
+  .titlebar {
+    height:48px; background:var(--bg-surface); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; padding:0 16px; gap:12px; flex-shrink:0;
+  }
+  .traffic-lights { display:flex; gap:8px; margin-right:8px; }
+  .traffic-lights span { width:12px; height:12px; border-radius:50%; }
+  .tl-close{background:#ff5f57} .tl-min{background:#febc2e} .tl-max{background:#28c840}
+  .titlebar-logo { display:flex; align-items:center; gap:8px; font-weight:700; font-size:13px; color:var(--text-secondary); }
+  .titlebar-logo .mark { width:20px; height:20px; background:var(--green); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#000; font-weight:800; }
+  .titlebar-nav { display:flex; gap:2px; margin-left:24px; background:var(--bg-elevated); border-radius:var(--radius-sm); padding:2px; border:1px solid var(--border-subtle); }
+  .titlebar-nav button { padding:5px 14px; font-size:12px; font-weight:600; font-family:inherit; background:none; border:none; border-radius:4px; color:var(--text-tertiary); cursor:pointer; }
+  .titlebar-nav button.active { background:var(--bg-active); color:var(--text-primary); }
+  .titlebar-right { margin-left:auto; display:flex; align-items:center; gap:14px; }
+  .capture-badge { display:flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; background:var(--amber-dim); border:1px solid var(--amber)22; }
+  .capture-badge .dot { width:6px; height:6px; border-radius:50%; background:var(--amber); }
+  .capture-badge span { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--amber); font-weight:500; }
+
+  /* ═══ TOOLBAR ═══ */
+  .prof-toolbar {
+    height: 38px; background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 16px; gap: 10px; flex-shrink: 0;
+  }
+  .prof-toolbar .pt-label {
+    font-size: 11px; font-weight: 600; color: var(--text-tertiary);
+  }
+  .prof-toolbar .pt-val {
+    font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600;
+  }
+  .pt-sep { width:1px; height:16px; background:var(--border); }
+  .pt-btn {
+    padding:4px 10px; border-radius:4px; font-size:10.5px; font-weight:600;
+    font-family:inherit; background:var(--bg-elevated); border:1px solid var(--border-subtle);
+    color:var(--text-tertiary); cursor:pointer;
+  }
+  .pt-btn.active { background:var(--bg-active); color:var(--text-secondary); }
+  .pt-btn.record { background:var(--red-dim); border-color:var(--red)33; color:var(--red); }
+  .zoom-controls { margin-left:auto; display:flex; gap:4px; }
+
+  /* ═══ LAYOUT ═══ */
+  .layout { display:flex; flex:1; overflow:hidden; }
+
+  /* ═══ TIMELINE MAIN ═══ */
+  .timeline-main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* ─── RULER ─── */
+  .ruler {
+    height: 24px;
+    padding: 0 0 0 var(--label-w);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-end;
+    position: relative; flex-shrink: 0;
+    background: var(--bg-surface);
+  }
+  .ruler-ticks {
+    display: flex; justify-content: space-between; width: 100%;
+    padding: 0 12px 3px;
+    font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--text-dim);
+  }
+  .ruler-ticks span { position:relative; }
+  .ruler-ticks span::before {
+    content:''; position:absolute; top:-4px; left:50%; width:1px; height:4px;
+    background:var(--text-dim);
+  }
+
+  /* ─── SELECTION HIGHLIGHT ─── */
+  .selection-overlay {
+    position: absolute; top: 0; height: 100%;
+    background: var(--green)08;
+    border-left: 1px solid var(--green)33;
+    border-right: 1px solid var(--green)33;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* ─── LANE CONTAINER ─── */
+  .lanes-container {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    position: relative;
+  }
+  /* Grid lines behind lanes */
+  .lanes-grid {
+    position: absolute; top:0; left:var(--label-w); right:0; bottom:0;
+    pointer-events:none; z-index:0;
+    display:flex; justify-content:space-between;
+    padding: 0 12px;
+  }
+  .lanes-grid .vline { width:1px; height:100%; background:var(--border-subtle); }
+
+  /* ─── LANE GROUP ─── */
+  .lane-group {
+    border-bottom: 1px solid var(--border);
+  }
+  .lane-group-header {
+    height: 26px;
+    display: flex; align-items: center;
+    padding: 0 10px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-dim);
+    position: sticky; top: 0; z-index: 2;
+  }
+  .lane-group-header .lg-icon {
+    width: 8px; height: 8px; border-radius: 2px;
+    margin-right: 8px; flex-shrink: 0;
+  }
+  .lane-group-header .lg-stats {
+    margin-left: auto;
+    font-family:'JetBrains Mono',monospace;
+    font-size: 9px; font-weight: 500;
+    color: var(--text-dim);
+    display: flex; gap: 10px;
+  }
+
+  /* ─── LANE ROW ─── */
+  .lane-row {
+    height: var(--lane-h);
+    display: flex; align-items: center;
+    border-bottom: 1px solid var(--border-subtle);
+    position: relative; z-index: 1;
+  }
+  .lane-row:hover { background: var(--bg-hover); }
+
+  .lane-label {
+    width: var(--label-w); flex-shrink: 0;
+    padding: 0 10px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10.5px; color: var(--text-secondary);
+    overflow: hidden;
+  }
+  .lane-label .ll-indent { flex-shrink:0; }
+  .lane-label .ll-name {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-weight: 500;
+  }
+  .lane-label .ll-name.dim { color: var(--text-tertiary); font-weight: 400; }
+
+  .lane-track {
+    flex: 1; height: var(--lane-h);
+    position: relative; padding: 0 12px;
+  }
+
+  /* ─── KERNEL BLOCKS ─── */
+  .kb {
+    position: absolute; height: 16px; top: 6px;
+    border-radius: 2px; min-width: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-family:'JetBrains Mono',monospace;
+    font-size: 7.5px; font-weight: 600;
+    color: rgba(255,255,255,0.8);
+    overflow: hidden; white-space: nowrap;
+    cursor: pointer; transition: filter 0.1s;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .kb:hover { filter: brightness(1.4); z-index: 10; }
+  .kb.selected { outline: 1.5px solid var(--text-primary); outline-offset: 1px; z-index: 11; }
+
+  .kb-gemm { background:var(--k-gemm)88; border:1px solid var(--k-gemm)55; }
+  .kb-attn { background:var(--k-attn)88; border:1px solid var(--k-attn)55; }
+  .kb-norm { background:var(--k-norm)88; border:1px solid var(--k-norm)55; }
+  .kb-act { background:var(--k-act)88; border:1px solid var(--k-act)55; }
+  .kb-embed { background:var(--k-embed)88; border:1px solid var(--k-embed)55; }
+  .kb-sample { background:var(--k-sample)88; border:1px solid var(--k-sample)55; }
+  .kb-moe { background:var(--k-moe)88; border:1px solid var(--k-moe)55; }
+  .kb-memcpy { background:var(--k-memcpy)88; border:1px solid var(--k-memcpy)55; }
+  .kb-sync { background:var(--k-sync)55; border:1px solid var(--k-sync)44; }
+  .kb-idle { background:var(--k-idle); border:1px solid var(--border); }
+
+  /* Thin bars for utilization lanes */
+  .util-bar {
+    position: absolute; bottom: 4px;
+    height: 0; width: 1px;
+    border-radius: 0.5px 0.5px 0 0;
+  }
+
+  /* ─── WARP OCCUPANCY LANE (special) ─── */
+  .warp-track {
+    flex: 1; height: var(--lane-h);
+    position: relative; padding: 0 12px;
+    display: flex; align-items: flex-end; gap: 0;
+  }
+  .warp-bar {
+    width: 2px; border-radius: 1px 1px 0 0;
+    margin-bottom: 4px;
+  }
+
+  /* ═══ DETAIL PANEL ═══ */
+  .detail-panel {
+    width: var(--detail-w);
+    border-left: 1px solid var(--border);
+    background: var(--bg-surface);
+    overflow-y: auto; flex-shrink: 0;
+    display: flex; flex-direction: column;
+  }
+  .detail-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .detail-header .dh-type {
+    font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 3px;
+  }
+  .detail-header h3 {
+    font-size: 14px; font-weight: 700;
+    letter-spacing: -0.02em; margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .detail-header .dh-sub {
+    font-size: 10.5px; color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .detail-tabs {
+    display:flex; border-bottom:1px solid var(--border-subtle); padding:0 16px;
+  }
+  .detail-tab {
+    padding:8px 12px; font-size:10.5px; font-weight:600;
+    color:var(--text-dim); cursor:pointer;
+    border-bottom:2px solid transparent;
+  }
+  .detail-tab.active { color:var(--green); border-bottom-color:var(--green); }
+
+  .detail-section { padding:12px 16px; border-bottom:1px solid var(--border-subtle); }
+  .detail-section-title {
+    font-size:9px; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.08em; color:var(--text-dim); margin-bottom:10px;
+  }
+
+  .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .stat-grid-3 { grid-template-columns:1fr 1fr 1fr; }
+  .stat-item {
+    padding:8px 10px; background:var(--bg-elevated);
+    border-radius:var(--radius-sm); border:1px solid var(--border-subtle);
+  }
+  .stat-label { font-size:8.5px; color:var(--text-dim); font-weight:600; margin-bottom:2px; text-transform:uppercase; letter-spacing:0.05em; }
+  .stat-value { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; }
+
+  /* Roofline mini-chart */
+  .roofline-mini {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    height: 110px;
+  }
+  .roofline-mini .rm-title {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 6px;
+  }
+  .roofline-svg { width:100%; height:calc(100% - 16px); }
+
+  /* Source code block */
+  .source-block {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family:'JetBrains Mono',monospace;
+    font-size: 10px; line-height: 1.7;
+    color: var(--text-secondary);
+    max-height: 140px; overflow-y: auto;
+  }
+  .source-block .ln { color: var(--text-dim); display: inline-block; width: 24px; text-align: right; margin-right: 10px; user-select: none; }
+  .source-block .kw { color: var(--purple); }
+  .source-block .fn { color: var(--green); }
+  .source-block .cm { color: var(--text-dim); font-style: italic; }
+  .source-block .ty { color: var(--cyan); }
+  .source-block .num { color: var(--amber); }
+  .source-block .hot-line { background: var(--amber)0c; display: block; margin: 0 -12px; padding: 0 12px; border-left: 2px solid var(--amber); }
+
+  /* Metric bar */
+  .metric-bar-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0;
+  }
+  .metric-bar-label {
+    font-size: 10.5px; color: var(--text-tertiary);
+    width: 100px; flex-shrink: 0;
+  }
+  .metric-bar-track {
+    flex: 1; height: 5px; background: var(--bg-active);
+    border-radius: 3px; overflow: hidden;
+  }
+  .metric-bar-fill { height:100%; border-radius:3px; }
+  .metric-bar-val {
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    font-weight:600; width:50px; text-align:right; flex-shrink:0;
+  }
+
+  /* ═══ LEGEND BAR ═══ */
+  .legend-bar {
+    height: 28px; background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 16px; gap: 14px; flex-shrink: 0;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 9.5px; color: var(--text-dim); font-weight: 500;
+  }
+  .legend-dot { width:10px; height:5px; border-radius:1px; }
+  .legend-bar .spacer { flex:1; }
+  .legend-bar .lb-stat {
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--text-dim);
+  }
+
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+  /* animation */
+  .lane-row { animation: lane-in 0.15s ease both; }
+  @keyframes lane-in { from { opacity:0; } to { opacity:1; } }
+</style>
+</head>
+<body>
+
+<div class="window">
+
+  <!-- ═══ TITLEBAR ═══ -->
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-min"></span><span class="tl-max"></span></div>
+    <div class="titlebar-logo"><div class="mark">θ</div> Spark Pulse</div>
+    <div class="titlebar-nav">
+      <button>Monitor</button>
+      <button class="active">Profiler</button>
+      <button>Memory</button>
+      <button>Bandwidth</button>
+      <button>Thermals</button>
+    </div>
+    <div class="titlebar-right">
+      <div class="capture-badge">
+        <div class="dot"></div>
+        <span>Capture: sglang_inference_001.nsys · 84ms</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PROFILER TOOLBAR ═══ -->
+  <div class="prof-toolbar">
+    <span class="pt-label">Process:</span>
+    <span class="pt-val" style="color:var(--green)">sglang.server (PID 4821)</span>
+    <span class="pt-sep"></span>
+    <span class="pt-label">Duration:</span>
+    <span class="pt-val" style="color:var(--text-primary)">84.2 ms</span>
+    <span class="pt-sep"></span>
+    <span class="pt-label">Kernels:</span>
+    <span class="pt-val" style="color:var(--amber)">347</span>
+    <span class="pt-sep"></span>
+    <span class="pt-label">GPU Active:</span>
+    <span class="pt-val" style="color:var(--green)">96.1%</span>
+    <span class="pt-sep"></span>
+    <button class="pt-btn record">● Capture</button>
+    <div class="zoom-controls">
+      <button class="pt-btn">−</button>
+      <button class="pt-btn active">Fit</button>
+      <button class="pt-btn">+</button>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- ═══ TIMELINE ═══ -->
+    <div class="timeline-main">
+
+      <!-- Ruler -->
+      <div class="ruler">
+        <div class="ruler-ticks">
+          <span>0 ms</span><span>10.5</span><span>21.0</span><span>31.5</span><span>42.0</span><span>52.5</span><span>63.0</span><span>73.5</span><span>84.2 ms</span>
+        </div>
+      </div>
+
+      <div class="lanes-container">
+        <!-- Background grid -->
+        <div class="lanes-grid">
+          <div class="vline"></div><div class="vline"></div><div class="vline"></div>
+          <div class="vline"></div><div class="vline"></div><div class="vline"></div>
+          <div class="vline"></div><div class="vline"></div>
+        </div>
+
+        <!-- ═══ CUDA API GROUP ═══ -->
+        <div class="lane-group">
+          <div class="lane-group-header">
+            <div class="lg-icon" style="background:var(--blue)"></div>
+            CUDA Runtime API
+            <div class="lg-stats">
+              <span>cudaLaunchKernel: 347</span>
+              <span>cudaMemcpy: 24</span>
+            </div>
+          </div>
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-name">cudaLaunchKernel</span></div>
+            <div class="lane-track">
+              <!-- Dense small blocks representing API calls -->
+              <div class="kb kb-gemm" style="left:0%;width:0.8%"></div>
+              <div class="kb kb-attn" style="left:1.2%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:3.4%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:4.2%;width:0.3%"></div>
+              <div class="kb kb-act" style="left:4.8%;width:0.4%"></div>
+              <div class="kb kb-moe" style="left:5.5%;width:0.5%"></div>
+              <div class="kb kb-gemm" style="left:6.3%;width:0.7%"></div>
+              <div class="kb kb-attn" style="left:7.4%;width:1.6%"></div>
+              <div class="kb kb-gemm" style="left:9.4%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:10.2%;width:0.3%"></div>
+              <div class="kb kb-act" style="left:10.8%;width:0.4%"></div>
+              <div class="kb kb-moe" style="left:11.5%;width:0.5%"></div>
+              <div class="kb kb-gemm" style="left:12.3%;width:0.7%"></div>
+              <div class="kb kb-attn" style="left:13.4%;width:1.8%"></div>
+              <!-- repeating pattern through decode layers -->
+              <div class="kb kb-gemm" style="left:15.6%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:16.5%;width:0.3%"></div>
+              <div class="kb kb-moe" style="left:17.1%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:18%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:20.2%;width:0.7%"></div>
+              <div class="kb kb-act" style="left:21.2%;width:0.4%"></div>
+              <div class="kb kb-moe" style="left:22%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:23%;width:1.6%"></div>
+              <div class="kb kb-gemm" style="left:25%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:26%;width:0.3%"></div>
+              <div class="kb kb-attn" style="left:27%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:29.2%;width:0.7%"></div>
+              <div class="kb kb-moe" style="left:30.3%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:31.2%;width:1.6%"></div>
+              <!-- mid-range -->
+              <div class="kb kb-gemm" style="left:33.2%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:34.2%;width:0.3%"></div>
+              <div class="kb kb-act" style="left:34.8%;width:0.4%"></div>
+              <div class="kb kb-moe" style="left:35.5%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:36.4%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:38.6%;width:0.7%"></div>
+              <div class="kb kb-moe" style="left:39.7%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:40.6%;width:1.6%"></div>
+              <div class="kb kb-gemm" style="left:42.6%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:43.6%;width:0.3%"></div>
+              <div class="kb kb-attn" style="left:44.3%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:46.5%;width:0.7%"></div>
+              <div class="kb kb-moe" style="left:47.6%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:48.5%;width:1.6%"></div>
+              <!-- late range -->
+              <div class="kb kb-gemm" style="left:50.5%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:51.5%;width:0.3%"></div>
+              <div class="kb kb-act" style="left:52.1%;width:0.4%"></div>
+              <div class="kb kb-attn" style="left:52.9%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:55.1%;width:0.7%"></div>
+              <div class="kb kb-moe" style="left:56.2%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:57.1%;width:1.6%"></div>
+              <div class="kb kb-gemm" style="left:59.1%;width:0.6%"></div>
+              <div class="kb kb-attn" style="left:60.1%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:62.3%;width:0.7%"></div>
+              <div class="kb kb-moe" style="left:63.4%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:64.3%;width:1.6%"></div>
+              <div class="kb kb-gemm" style="left:66.3%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:67.3%;width:0.3%"></div>
+              <div class="kb kb-attn" style="left:68%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:70.2%;width:0.7%"></div>
+              <div class="kb kb-moe" style="left:71.3%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:72.2%;width:1.6%"></div>
+              <div class="kb kb-gemm" style="left:74.2%;width:0.6%"></div>
+              <div class="kb kb-attn" style="left:75.2%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:77.4%;width:0.7%"></div>
+              <div class="kb kb-moe" style="left:78.5%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:79.4%;width:1.6%"></div>
+              <div class="kb kb-gemm" style="left:81.4%;width:0.6%"></div>
+              <div class="kb kb-norm" style="left:82.4%;width:0.3%"></div>
+              <div class="kb kb-attn" style="left:83.1%;width:1.8%"></div>
+              <div class="kb kb-gemm" style="left:85.3%;width:0.7%"></div>
+              <div class="kb kb-moe" style="left:86.4%;width:0.5%"></div>
+              <div class="kb kb-attn" style="left:87.3%;width:1.6%"></div>
+              <div class="kb kb-sample" style="left:89.3%;width:0.4%"></div>
+              <div class="kb kb-memcpy" style="left:90.1%;width:1.2%"></div>
+              <div class="kb kb-sample" style="left:91.7%;width:0.4%"></div>
+            </div>
+          </div>
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-name dim">cudaMemcpyAsync</span></div>
+            <div class="lane-track">
+              <div class="kb kb-memcpy" style="left:0%;width:0.5%"></div>
+              <div class="kb kb-memcpy" style="left:45%;width:0.3%"></div>
+              <div class="kb kb-memcpy" style="left:90%;width:1.5%">D2H</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ GPU KERNELS GROUP ═══ -->
+        <div class="lane-group">
+          <div class="lane-group-header">
+            <div class="lg-icon" style="background:var(--green)"></div>
+            GPU Kernels — Blackwell SM
+            <div class="lg-stats">
+              <span>Occupancy: 78%</span>
+              <span>Active: 96.1%</span>
+              <span>Stall: 3.9%</span>
+            </div>
+          </div>
+
+          <!-- Attention -->
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name">flash_attn_fwd_fp4</span></div>
+            <div class="lane-track">
+              <div class="kb kb-attn selected" style="left:1.2%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:7.4%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:13.4%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:18%;width:4.6%">2.0ms</div>
+              <div class="kb kb-attn" style="left:23%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:27%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:31.2%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:36.4%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:40.6%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:44.3%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:48.5%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:52.9%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:57.1%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:60.1%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:64.3%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:68%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:72.2%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:75.2%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:79.4%;width:4.4%">1.9ms</div>
+              <div class="kb kb-attn" style="left:83.1%;width:4.8%">2.1ms</div>
+              <div class="kb kb-attn" style="left:87.3%;width:3%">1.3ms</div>
+            </div>
+          </div>
+
+          <!-- GEMM -->
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name">cutlass_gemm_fp4</span></div>
+            <div class="lane-track">
+              <div class="kb kb-gemm" style="left:0%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:3.4%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:6.3%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:9.4%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:12.3%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:15.6%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:20.2%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:25%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:29.2%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:33.2%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:38.6%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:42.6%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:46.5%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:50.5%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:55.1%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:59.1%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:62.3%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:66.3%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:70.2%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:74.2%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:77.4%;width:1%"></div>
+              <div class="kb kb-gemm" style="left:81.4%;width:0.8%"></div>
+              <div class="kb kb-gemm" style="left:85.3%;width:1%"></div>
+            </div>
+          </div>
+
+          <!-- MoE Gate -->
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name">moe_gate_topk</span></div>
+            <div class="lane-track">
+              <div class="kb kb-moe" style="left:5.5%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:11.5%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:17.1%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:22%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:30.3%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:35.5%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:39.7%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:47.6%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:56.2%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:63.4%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:71.3%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:78.5%;width:0.6%"></div>
+              <div class="kb kb-moe" style="left:86.4%;width:0.6%"></div>
+            </div>
+          </div>
+
+          <!-- RMSNorm -->
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name dim">rms_norm_kernel</span></div>
+            <div class="lane-track">
+              <div class="kb kb-norm" style="left:4.2%;width:0.3%"></div>
+              <div class="kb kb-norm" style="left:10.2%;width:0.3%"></div>
+              <div class="kb kb-norm" style="left:16.5%;width:0.3%"></div>
+              <div class="kb kb-norm" style="left:26%;width:0.3%"></div>
+              <div class="kb kb-norm" style="left:34.2%;width:0.3%"></div>
+              <div class="kb kb-norm" style="left:43.6%;width:0.3%"></div>
+              <div class="kb kb-norm" style="left:51.5%;width:0.3%"></div>
+              <div class="kb kb-norm" style="left:67.3%;width:0.3%"></div>
+              <div class="kb kb-norm" style="left:82.4%;width:0.3%"></div>
+            </div>
+          </div>
+
+          <!-- SiLU Activation -->
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name dim">silu_and_mul</span></div>
+            <div class="lane-track">
+              <div class="kb kb-act" style="left:4.8%;width:0.4%"></div>
+              <div class="kb kb-act" style="left:10.8%;width:0.4%"></div>
+              <div class="kb kb-act" style="left:21.2%;width:0.4%"></div>
+              <div class="kb kb-act" style="left:34.8%;width:0.4%"></div>
+              <div class="kb kb-act" style="left:52.1%;width:0.4%"></div>
+            </div>
+          </div>
+
+          <!-- Sampling -->
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name dim">top_p_sampling</span></div>
+            <div class="lane-track">
+              <div class="kb kb-sample" style="left:89.3%;width:0.6%"></div>
+              <div class="kb kb-sample" style="left:91.7%;width:0.6%"></div>
+              <div class="kb kb-sample" style="left:93%;width:0.6%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ MEMORY GROUP ═══ -->
+        <div class="lane-group">
+          <div class="lane-group-header">
+            <div class="lg-icon" style="background:var(--blue)"></div>
+            Memory Operations — Unified LPDDR5x
+            <div class="lg-stats">
+              <span>BW: 218 GB/s avg</span>
+              <span>Peak: 261 GB/s</span>
+              <span>Transfers: 24</span>
+            </div>
+          </div>
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name">KV Cache R/W</span></div>
+            <div class="lane-track">
+              <div class="kb kb-memcpy" style="left:1%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:7%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:13%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:18%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:23%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:27%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:31%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:36%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:40%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:44%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:48%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:53%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:57%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:60%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:64%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:68%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:72%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:75%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:79%;width:1%"></div>
+              <div class="kb kb-memcpy" style="left:83%;width:1.2%"></div>
+              <div class="kb kb-memcpy" style="left:87%;width:1%"></div>
+            </div>
+          </div>
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name dim">Host ↔ Device</span></div>
+            <div class="lane-track">
+              <div class="kb kb-memcpy" style="left:0%;width:0.8%">H2D 1.2MB</div>
+              <div class="kb kb-memcpy" style="left:90%;width:2%">D2H 48KB</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ TENSOR CORE UTILIZATION GROUP ═══ -->
+        <div class="lane-group">
+          <div class="lane-group-header">
+            <div class="lg-icon" style="background:var(--green-bright)"></div>
+            Tensor Core Utilization — 5th Gen FP4
+            <div class="lg-stats">
+              <span>Avg: 81.2%</span>
+              <span>Peak: 94%</span>
+            </div>
+          </div>
+          <div class="lane-row" style="height:36px">
+            <div class="lane-label"><span class="ll-name">FP4 MMA Pipe</span></div>
+            <div class="lane-track" style="height:36px">
+              <!-- Utilization heatmap as tiny bars -->
+              <svg width="100%" height="28" viewBox="0 0 800 28" preserveAspectRatio="none" style="position:absolute;top:4px;left:12px;right:12px">
+                <!-- High utilization blocks (green tones) -->
+                <rect x="8" y="2" width="48" height="24" rx="1" fill="var(--green)" opacity="0.7"/>
+                <rect x="60" y="2" width="44" height="24" rx="1" fill="var(--green)" opacity="0.6"/>
+                <rect x="108" y="2" width="48" height="24" rx="1" fill="var(--green)" opacity="0.75"/>
+                <rect x="160" y="2" width="40" height="24" rx="1" fill="var(--green)" opacity="0.65"/>
+                <rect x="204" y="2" width="44" height="24" rx="1" fill="var(--green)" opacity="0.7"/>
+                <rect x="252" y="2" width="48" height="24" rx="1" fill="var(--green)" opacity="0.8"/>
+                <rect x="304" y="2" width="42" height="24" rx="1" fill="var(--green)" opacity="0.65"/>
+                <rect x="350" y="2" width="48" height="24" rx="1" fill="var(--green)" opacity="0.75"/>
+                <rect x="402" y="2" width="44" height="24" rx="1" fill="var(--green)" opacity="0.7"/>
+                <rect x="450" y="2" width="48" height="24" rx="1" fill="var(--green)" opacity="0.8"/>
+                <rect x="502" y="2" width="42" height="24" rx="1" fill="var(--green)" opacity="0.65"/>
+                <rect x="548" y="2" width="48" height="24" rx="1" fill="var(--green)" opacity="0.75"/>
+                <rect x="600" y="2" width="44" height="24" rx="1" fill="var(--green)" opacity="0.7"/>
+                <rect x="648" y="2" width="48" height="24" rx="1" fill="var(--green)" opacity="0.8"/>
+                <rect x="700" y="2" width="30" height="24" rx="1" fill="var(--green)" opacity="0.5"/>
+                <rect x="734" y="2" width="14" height="24" rx="1" fill="var(--green)" opacity="0.3"/>
+                <!-- Idle gaps between layers (dark) -->
+                <rect x="56" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="104" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="156" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="200" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="248" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="300" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="346" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="398" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="446" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="498" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="544" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="596" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="644" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="696" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+                <rect x="730" y="2" width="4" height="24" rx="1" fill="var(--bg-active)"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ COPY ENGINE GROUP ═══ -->
+        <div class="lane-group">
+          <div class="lane-group-header">
+            <div class="lg-icon" style="background:var(--cyan)"></div>
+            Copy Engine (CE 0 / CE 1)
+            <div class="lg-stats">
+              <span>CE0: H2D 1.2 MB</span>
+              <span>CE1: D2H 48 KB</span>
+            </div>
+          </div>
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name dim">CE 0 (H2D)</span></div>
+            <div class="lane-track">
+              <div class="kb kb-memcpy" style="left:0%;width:1.5%">input tokens</div>
+            </div>
+          </div>
+          <div class="lane-row">
+            <div class="lane-label"><span class="ll-indent" style="width:10px"></span><span class="ll-name dim">CE 1 (D2H)</span></div>
+            <div class="lane-track">
+              <div class="kb kb-memcpy" style="left:89%;width:2.5%">logits out</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ DETAIL PANEL ═══ -->
+    <div class="detail-panel">
+      <div class="detail-header">
+        <div class="dh-type" style="color:var(--k-attn)">GPU Kernel</div>
+        <h3>flash_attn_fwd_fp4</h3>
+        <div class="dh-sub">Layer 0 · Head 0-7 · Invocation 1 of 21</div>
+      </div>
+
+      <div class="detail-tabs">
+        <div class="detail-tab active">Metrics</div>
+        <div class="detail-tab">Source</div>
+        <div class="detail-tab">Occupancy</div>
+        <div class="detail-tab">Roofline</div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Execution</div>
+        <div class="stat-grid stat-grid-3">
+          <div class="stat-item">
+            <div class="stat-label">Duration</div>
+            <div class="stat-value" style="color:var(--k-attn)">2.1 ms</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Grid</div>
+            <div class="stat-value" style="color:var(--text-secondary)">512,8,1</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Block</div>
+            <div class="stat-value" style="color:var(--text-secondary)">128,1,1</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Registers</div>
+            <div class="stat-value" style="color:var(--text-secondary)">128</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Shared Mem</div>
+            <div class="stat-value" style="color:var(--cyan)">48 KB</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Warps</div>
+            <div class="stat-value" style="color:var(--text-secondary)">4</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Throughput</div>
+        <div class="metric-bar-row">
+          <span class="metric-bar-label">SM Active</span>
+          <div class="metric-bar-track"><div class="metric-bar-fill" style="width:94%;background:var(--green)"></div></div>
+          <span class="metric-bar-val" style="color:var(--green)">94%</span>
+        </div>
+        <div class="metric-bar-row">
+          <span class="metric-bar-label">Tensor Active</span>
+          <div class="metric-bar-track"><div class="metric-bar-fill" style="width:88%;background:var(--green-bright)"></div></div>
+          <span class="metric-bar-val" style="color:var(--green-bright)">88%</span>
+        </div>
+        <div class="metric-bar-row">
+          <span class="metric-bar-label">Mem BW Util</span>
+          <div class="metric-bar-track"><div class="metric-bar-fill" style="width:82%;background:var(--cyan)"></div></div>
+          <span class="metric-bar-val" style="color:var(--cyan)">82%</span>
+        </div>
+        <div class="metric-bar-row">
+          <span class="metric-bar-label">Occupancy</span>
+          <div class="metric-bar-track"><div class="metric-bar-fill" style="width:78%;background:var(--blue)"></div></div>
+          <span class="metric-bar-val" style="color:var(--blue)">78%</span>
+        </div>
+        <div class="metric-bar-row">
+          <span class="metric-bar-label">L2 Hit Rate</span>
+          <div class="metric-bar-track"><div class="metric-bar-fill" style="width:62%;background:var(--purple)"></div></div>
+          <span class="metric-bar-val" style="color:var(--purple)">62%</span>
+        </div>
+        <div class="metric-bar-row">
+          <span class="metric-bar-label">Warp Stall</span>
+          <div class="metric-bar-track"><div class="metric-bar-fill" style="width:11%;background:var(--red)"></div></div>
+          <span class="metric-bar-val" style="color:var(--red)">11%</span>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Roofline Position</div>
+        <div class="roofline-mini">
+          <svg class="roofline-svg" viewBox="0 0 300 70" preserveAspectRatio="xMidYMid meet">
+            <!-- Axes -->
+            <line x1="30" y1="60" x2="290" y2="60" stroke="var(--border)" stroke-width="0.5"/>
+            <line x1="30" y1="10" x2="30" y2="60" stroke="var(--border)" stroke-width="0.5"/>
+            <!-- Axis labels -->
+            <text x="160" y="70" font-family="JetBrains Mono" font-size="6" fill="var(--text-dim)" text-anchor="middle">Arithmetic Intensity (FLOPs/Byte)</text>
+            <text x="8" y="35" font-family="JetBrains Mono" font-size="6" fill="var(--text-dim)" text-anchor="middle" transform="rotate(-90,8,35)">TFLOPS</text>
+            <!-- Roof lines -->
+            <polyline points="30,55 100,30 290,30" fill="none" stroke="var(--green)" stroke-width="1" opacity="0.4"/>
+            <text x="160" y="27" font-family="JetBrains Mono" font-size="6" fill="var(--green)" opacity="0.5">FP4 Peak: 1000 TOPS</text>
+            <polyline points="30,55 80,40 290,40" fill="none" stroke="var(--cyan)" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.3"/>
+            <text x="240" y="38" font-family="JetBrains Mono" font-size="5" fill="var(--cyan)" opacity="0.4">273 GB/s</text>
+            <!-- This kernel's position -->
+            <circle cx="155" cy="33" r="4" fill="var(--k-attn)" opacity="0.9"/>
+            <circle cx="155" cy="33" r="8" fill="none" stroke="var(--k-attn)" stroke-width="0.8" opacity="0.4"/>
+            <text x="155" y="20" font-family="JetBrains Mono" font-size="6" fill="var(--k-attn)" text-anchor="middle">flash_attn ●</text>
+            <!-- Other kernels for context -->
+            <circle cx="200" cy="36" r="3" fill="var(--k-gemm)" opacity="0.6"/>
+            <circle cx="80" cy="46" r="3" fill="var(--k-norm)" opacity="0.6"/>
+            <circle cx="120" cy="40" r="3" fill="var(--k-moe)" opacity="0.6"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Launch Parameters</div>
+        <div class="source-block">
+<span class="ln">1</span><span class="cm">// flash_attn_fwd_fp4 — Blackwell SM</span>
+<span class="ln">2</span><span class="kw">gridDim</span>  = (<span class="num">512</span>, <span class="num">8</span>, <span class="num">1</span>)
+<span class="ln">3</span><span class="kw">blockDim</span> = (<span class="num">128</span>, <span class="num">1</span>, <span class="num">1</span>)
+<span class="ln">4</span><span class="kw">shared</span>   = <span class="num">49152</span> <span class="cm">// 48 KB</span>
+<span class="ln">5</span>
+<span class="hot-line"><span class="ln">6</span><span class="cm">// Bottleneck: memory-bound at 82% BW</span></span>
+<span class="ln">7</span><span class="cm">// KV cache reads dominate — 8 heads</span>
+<span class="ln">8</span><span class="cm">// × 128 seq_len × fp4 = 4096 bytes/head</span>
+<span class="ln">9</span>
+<span class="ln">10</span><span class="kw">precision</span>: <span class="ty">FP4</span> (NVFP4 tensor core)
+<span class="ln">11</span><span class="kw">model</span>:     INTELLECT-3-MoE
+<span class="ln">12</span><span class="kw">context</span>:   <span class="num">8192</span> tokens
+<span class="ln">13</span><span class="kw">batch</span>:     <span class="num">1</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ═══ LEGEND BAR ═══ -->
+  <div class="legend-bar">
+    <span class="legend-item"><span class="legend-dot" style="background:var(--k-attn)88"></span> Attention</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--k-gemm)88"></span> GEMM</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--k-moe)88"></span> MoE Gate</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--k-norm)88"></span> Norm</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--k-act)88"></span> Activation</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--k-sample)88"></span> Sampling</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--k-memcpy)88"></span> Memory</span>
+    <span class="spacer"></span>
+    <span class="lb-stat">347 kernels · 84.2ms capture · 96.1% GPU active · nvidia-smi + nsys over SSH</span>
+  </div>
+
+</div>
+
+</body>
+</html>

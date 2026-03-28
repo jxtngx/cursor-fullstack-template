@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>experiment-logger — DGX Mode</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #0a0a0c;
+    --bg-surface: #111114;
+    --bg-elevated: #18181c;
+    --bg-hover: #1f1f25;
+    --bg-active: #28282f;
+    --border: #242430;
+    --border-subtle: #1c1c26;
+    --border-focus: #76b90055;
+    --text-primary: #e8e6e3;
+    --text-secondary: #908e99;
+    --text-tertiary: #5a5868;
+    --text-dim: #3d3b48;
+    --green: #76b900;
+    --green-dim: #76b90028;
+    --green-glow: #76b90010;
+    --amber: #f59e0b;
+    --amber-dim: #f59e0b1e;
+    --red: #ef4444;
+    --red-dim: #ef44441e;
+    --blue: #60a5fa;
+    --blue-dim: #60a5fa1e;
+    --purple: #a78bfa;
+    --purple-dim: #a78bfa1e;
+    --cyan: #22d3ee;
+    --cyan-dim: #22d3ee1e;
+    --rose: #fb7185;
+    --rose-dim: #fb71851e;
+    --chart-1: #76b900;
+    --chart-2: #60a5fa;
+    --chart-3: #f59e0b;
+    --chart-4: #a78bfa;
+    --chart-5: #fb7185;
+    --chart-6: #22d3ee;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --sidebar-w: 240px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Instrument Sans', -apple-system, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── WINDOW ─── */
+  .window { height:100vh; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+
+  /* ─── TITLEBAR ─── */
+  .titlebar {
+    height: 48px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .traffic-lights { display:flex; gap:8px; margin-right:8px; }
+  .traffic-lights span { width:12px; height:12px; border-radius:50%; }
+  .tl-close { background:#ff5f57; }
+  .tl-min { background:#febc2e; }
+  .tl-max { background:#28c840; }
+
+  .titlebar-logo {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 13px; color: var(--text-secondary);
+    letter-spacing: -0.01em;
+  }
+  .titlebar-logo .mark {
+    width: 20px; height: 20px;
+    background: var(--green);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: #000; font-weight: 800;
+  }
+
+  .titlebar-nav {
+    display: flex; gap: 2px;
+    margin-left: 24px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    border: 1px solid var(--border-subtle);
+  }
+  .titlebar-nav button {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .titlebar-nav button:hover { color: var(--text-secondary); }
+  .titlebar-nav button.active {
+    background: var(--bg-active);
+    color: var(--text-primary);
+  }
+
+  .titlebar-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .backend-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid var(--green)22;
+  }
+  .titlebar-env {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+  }
+
+  /* ─── LAYOUT ─── */
+  .layout { display:flex; flex:1; overflow:hidden; }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+  .sidebar-section { padding: 14px 10px 6px; }
+  .sidebar-section-title {
+    font-size: 9.5px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-dim); padding: 0 8px; margin-bottom: 6px;
+  }
+  .exp-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: var(--radius-sm);
+    cursor: pointer; transition: all 0.12s;
+    font-size: 12.5px; color: var(--text-secondary); font-weight: 500;
+  }
+  .exp-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .exp-item.active { background: var(--green-dim); color: var(--green); }
+  .exp-item .dot {
+    width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
+  }
+  .exp-item .runs {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    color: var(--text-dim);
+  }
+  .exp-item.active .runs { color: var(--green); opacity: 0.6; }
+
+  .sidebar-divider { height:1px; background:var(--border-subtle); margin:4px 10px; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 10px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .sidebar-footer .sf-row {
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-dim);
+    padding: 3px 8px;
+  }
+  .sidebar-footer .sf-row strong { color: var(--text-tertiary); }
+
+  /* ─── MAIN ─── */
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* Toolbar */
+  .toolbar {
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .toolbar h2 {
+    font-size: 15px; font-weight: 700;
+    letter-spacing: -0.02em; margin-right: 12px;
+  }
+  .toolbar .run-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+    padding: 3px 8px;
+    background: var(--bg-elevated);
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+  }
+  .filter-chips { display:flex; gap:4px; margin-left:12px; }
+  .chip {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .chip:hover { color: var(--text-secondary); border-color: var(--text-tertiary); }
+  .chip.active { border-color: var(--green)55; color: var(--green); background: var(--green-dim); }
+
+  .toolbar-spacer { flex:1; }
+  .toolbar-btn {
+    padding: 6px 12px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-secondary); font-size: 11.5px; font-weight: 500;
+    cursor: pointer; transition: all 0.12s; font-family: inherit;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .toolbar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .toolbar-btn.primary { background: var(--green); border-color: var(--green); color: #000; font-weight: 700; }
+
+  /* ─── CONTENT SPLIT ─── */
+  .content-split { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* ─── CHART AREA ─── */
+  .chart-area {
+    height: 280px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    gap: 12px;
+  }
+  .chart-panel {
+    flex: 1;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .chart-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .chart-panel-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+  }
+  .chart-panel-metric {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-dim);
+  }
+  .chart-body { flex:1; position:relative; }
+
+  /* SVG Charts */
+  .chart-svg { width:100%; height:100%; }
+  .grid-line { stroke: var(--border-subtle); stroke-width: 0.5; }
+  .axis-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: var(--text-dim);
+  }
+  .curve { fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .curve-1 { stroke: var(--chart-1); }
+  .curve-2 { stroke: var(--chart-2); }
+  .curve-3 { stroke: var(--chart-3); }
+  .curve-4 { stroke: var(--chart-4); }
+  .curve-shadow { fill:none; stroke-width:6; stroke-linecap:round; opacity:0.08; }
+  .curve-area { opacity: 0.06; }
+
+  .chart-legend {
+    display: flex; gap: 12px; margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10.5px; color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .legend-dot { width:8px; height:3px; border-radius:2px; }
+
+  /* ─── MINI CHARTS for secondary metrics ─── */
+  .mini-chart-panel {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mini-chart {
+    flex: 1;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+  }
+  .mini-chart-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .mini-chart-title {
+    font-size: 10px; font-weight: 600;
+    color: var(--text-tertiary); text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .mini-chart-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 700;
+  }
+  .mini-chart-body { flex:1; }
+
+  /* ─── RUN TABLE ─── */
+  .run-table-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 16px;
+  }
+  .run-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .run-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-base);
+    padding: 10px 10px;
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-dim);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    z-index: 1;
+  }
+  .run-table thead th:first-child { padding-left: 12px; }
+
+  .run-table tbody tr {
+    cursor: pointer;
+    transition: background 0.1s;
+    animation: row-in 0.25s ease both;
+  }
+  .run-table tbody tr:hover { background: var(--bg-elevated); }
+  .run-table tbody tr.selected { background: var(--green-glow); }
+
+  .run-table td {
+    padding: 10px 10px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+  }
+  .run-table td:first-child { padding-left: 12px; }
+
+  @keyframes row-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .run-table tbody tr:nth-child(1) { animation-delay: 0.02s; }
+  .run-table tbody tr:nth-child(2) { animation-delay: 0.04s; }
+  .run-table tbody tr:nth-child(3) { animation-delay: 0.06s; }
+  .run-table tbody tr:nth-child(4) { animation-delay: 0.08s; }
+  .run-table tbody tr:nth-child(5) { animation-delay: 0.10s; }
+  .run-table tbody tr:nth-child(6) { animation-delay: 0.12s; }
+  .run-table tbody tr:nth-child(7) { animation-delay: 0.14s; }
+  .run-table tbody tr:nth-child(8) { animation-delay: 0.16s; }
+
+  /* Run name cell */
+  .run-name-cell {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .run-color {
+    width: 4px; height: 28px;
+    border-radius: 2px; flex-shrink: 0;
+  }
+  .run-name {
+    font-weight: 600; font-size: 12.5px;
+    color: var(--text-primary);
+  }
+  .run-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-dim);
+  }
+
+  /* Checkbox */
+  .run-check {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-elevated);
+    cursor: pointer;
+    transition: all 0.12s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: transparent;
+    flex-shrink: 0;
+  }
+  .run-check.checked {
+    border-color: var(--green);
+    background: var(--green);
+    color: #000;
+  }
+
+  /* Status */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 10px;
+    font-size: 10.5px; font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .status-pill.complete { background: var(--green-dim); color: var(--green); }
+  .status-pill.running { background: var(--blue-dim); color: var(--blue); }
+  .status-pill.failed { background: var(--red-dim); color: var(--red); }
+  .status-dot-sm { width:5px; height:5px; border-radius:50%; background:currentColor; }
+  .status-pill.running .status-dot-sm { animation: pulse-sm 1.5s ease infinite; }
+  @keyframes pulse-sm {
+    0%,100% { opacity:1; } 50% { opacity:0.4; }
+  }
+
+  /* Metric cells */
+  .metric-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 600;
+  }
+  .metric-val.best { color: var(--green); }
+  .metric-val.mid { color: var(--text-primary); }
+  .metric-val.bad { color: var(--red); }
+  .metric-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px; color: var(--text-dim);
+  }
+
+  /* Sparkline in table */
+  .sparkline-cell { display:flex; align-items:center; gap:6px; }
+  .sparkline-svg { width:60px; height:20px; flex-shrink:0; }
+  .sparkline-path { fill:none; stroke-width:1.2; stroke-linecap:round; }
+
+  /* Duration */
+  .duration {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text-secondary);
+  }
+
+  /* Config tags */
+  .config-tags { display:flex; gap:3px; flex-wrap:wrap; }
+  .config-tag {
+    padding: 2px 6px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px; font-weight: 600;
+    background: var(--bg-active);
+    color: var(--text-tertiary);
+  }
+  .config-tag .cv { color: var(--cyan); }
+
+  /* ─── BOTTOM DETAIL DRAWER ─── */
+  .detail-drawer {
+    height: 0;
+    /* In a real app this would slide up */
+  }
+
+  /* ─── STATUSBAR ─── */
+  .statusbar {
+    height: 26px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 14px; gap: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px; color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .statusbar .sep { width:1px; height:10px; background:var(--border); }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+  /* ─── RESPONSIVE TABLE MONO ─── */
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .dim { color: var(--text-dim); }
+  .sec { color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<div class="window">
+
+  <!-- ═══ TITLEBAR ═══ -->
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <span class="tl-close"></span>
+      <span class="tl-min"></span>
+      <span class="tl-max"></span>
+    </div>
+    <div class="titlebar-logo">
+      <div class="mark">θ</div>
+      experiment-logger
+    </div>
+    <div class="titlebar-nav">
+      <button class="active">Experiments</button>
+      <button>Compare</button>
+      <button>Artifacts</button>
+      <button>DuckDB</button>
+    </div>
+    <div class="titlebar-right">
+      <span class="backend-badge">SQLite · local</span>
+      <span class="titlebar-env">~/.dgxmode/experiments/</span>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- ═══ SIDEBAR — EXPERIMENTS ═══ -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Experiments</div>
+        <div class="exp-item active">
+          <div class="dot" style="background:var(--chart-1)"></div>
+          llama-finetune
+          <span class="runs">7 runs</span>
+        </div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--chart-2)"></div>
+          hermes-dpo
+          <span class="runs">4 runs</span>
+        </div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--chart-3)"></div>
+          lab-agent-rag
+          <span class="runs">3 runs</span>
+        </div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--chart-4)"></div>
+          intellect-lora-math
+          <span class="runs">5 runs</span>
+        </div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--chart-5)"></div>
+          rl-code-verifier
+          <span class="runs">2 runs</span>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Quick Filters</div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--green);border-radius:50%"></div>
+          Completed
+          <span class="runs">18</span>
+        </div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--blue);border-radius:50%"></div>
+          Running
+          <span class="runs">1</span>
+        </div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--red);border-radius:50%"></div>
+          Failed
+          <span class="runs">2</span>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Pinned Metrics</div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--text-tertiary);border-radius:50%"></div>
+          best_loss
+        </div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--text-tertiary);border-radius:50%"></div>
+          eval_accuracy
+        </div>
+        <div class="exp-item">
+          <div class="dot" style="background:var(--text-tertiary);border-radius:50%"></div>
+          grad_norm
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="sf-row"><strong>DB:</strong> experiments.db · 4.2 MB</div>
+        <div class="sf-row"><strong>Parquet:</strong> 21 files · 89 MB</div>
+        <div class="sf-row"><strong>Artifacts:</strong> 14 checkpoints · 12.4 GB</div>
+      </div>
+    </div>
+
+    <!-- ═══ MAIN ═══ -->
+    <div class="main">
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <h2>llama-finetune</h2>
+        <span class="run-count">7 runs</span>
+        <div class="filter-chips">
+          <span class="chip active">All</span>
+          <span class="chip">Complete</span>
+          <span class="chip">Best Loss &lt; 0.8</span>
+          <span class="chip">lr = 1e-4</span>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn">⇅ Export CSV</button>
+        <button class="toolbar-btn">◈ Compare Selected</button>
+        <button class="toolbar-btn primary">+ New Run</button>
+      </div>
+
+      <div class="content-split">
+
+        <!-- ═══ CHART AREA ═══ -->
+        <div class="chart-area">
+
+          <!-- Main Loss Chart -->
+          <div class="chart-panel">
+            <div class="chart-panel-header">
+              <span class="chart-panel-title">Training Loss</span>
+              <span class="chart-panel-metric">step vs loss · smoothing 0.6</span>
+            </div>
+            <div class="chart-body">
+              <svg class="chart-svg" viewBox="0 0 520 170" preserveAspectRatio="none">
+                <!-- Grid -->
+                <line class="grid-line" x1="40" y1="10" x2="40" y2="155"/>
+                <line class="grid-line" x1="40" y1="155" x2="510" y2="155"/>
+                <line class="grid-line" x1="40" y1="118" x2="510" y2="118" stroke-dasharray="2,4"/>
+                <line class="grid-line" x1="40" y1="82" x2="510" y2="82" stroke-dasharray="2,4"/>
+                <line class="grid-line" x1="40" y1="46" x2="510" y2="46" stroke-dasharray="2,4"/>
+                <line class="grid-line" x1="40" y1="10" x2="510" y2="10" stroke-dasharray="2,4"/>
+                <!-- Y axis labels -->
+                <text class="axis-label" x="34" y="158" text-anchor="end">0.0</text>
+                <text class="axis-label" x="34" y="122" text-anchor="end">0.5</text>
+                <text class="axis-label" x="34" y="86" text-anchor="end">1.0</text>
+                <text class="axis-label" x="34" y="50" text-anchor="end">1.5</text>
+                <text class="axis-label" x="34" y="14" text-anchor="end">2.0</text>
+                <!-- X axis labels -->
+                <text class="axis-label" x="40" y="168">0</text>
+                <text class="axis-label" x="157" y="168">500</text>
+                <text class="axis-label" x="275" y="168">1000</text>
+                <text class="axis-label" x="393" y="168">1500</text>
+                <text class="axis-label" x="504" y="168">2000</text>
+
+                <!-- Run 7 (best, green) — area fill -->
+                <path class="curve-area" fill="var(--chart-1)" d="M40,30 C80,42 120,55 160,68 C200,78 240,88 280,100 C320,108 360,118 400,126 C440,132 480,135 510,136 L510,155 L40,155 Z"/>
+                <!-- Run 7 (best, green) -->
+                <path class="curve-shadow curve-1" d="M40,30 C80,42 120,55 160,68 C200,78 240,88 280,100 C320,108 360,118 400,126 C440,132 480,135 510,136"/>
+                <path class="curve curve-1" d="M40,30 C80,42 120,55 160,68 C200,78 240,88 280,100 C320,108 360,118 400,126 C440,132 480,135 510,136"/>
+
+                <!-- Run 5 (blue) -->
+                <path class="curve curve-2" d="M40,25 C80,38 120,52 160,64 C200,76 240,86 280,98 C320,110 360,120 400,130 C440,137 480,140 510,141" opacity="0.6"/>
+
+                <!-- Run 3 (amber) -->
+                <path class="curve curve-3" d="M40,22 C80,35 120,50 160,62 C200,75 240,90 280,104 C320,116 360,125 400,133 C440,139 480,143 510,144" opacity="0.45"/>
+
+                <!-- Run 1 (purple — failed early) -->
+                <path class="curve curve-4" d="M40,20 C80,30 120,42 160,48 C200,52 240,56 260,58" opacity="0.3"/>
+
+                <!-- Best marker -->
+                <circle cx="510" cy="136" r="3.5" fill="var(--chart-1)" opacity="0.9"/>
+                <circle cx="510" cy="136" r="7" fill="none" stroke="var(--chart-1)" stroke-width="1" opacity="0.3"/>
+              </svg>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot" style="background:var(--chart-1)"></span> run-7 · lr=1e-4</span>
+              <span class="legend-item"><span class="legend-dot" style="background:var(--chart-2)"></span> run-5 · lr=3e-4</span>
+              <span class="legend-item"><span class="legend-dot" style="background:var(--chart-3)"></span> run-3 · lr=5e-5</span>
+              <span class="legend-item"><span class="legend-dot" style="background:var(--chart-4)"></span> run-1 · lr=1e-3 <span style="color:var(--red);font-size:9px">✗ OOM</span></span>
+            </div>
+          </div>
+
+          <!-- Mini charts -->
+          <div class="mini-chart-panel">
+            <!-- LR schedule -->
+            <div class="mini-chart">
+              <div class="mini-chart-header">
+                <span class="mini-chart-title">Learning Rate</span>
+                <span class="mini-chart-val" style="color:var(--cyan)">1e-4</span>
+              </div>
+              <div class="mini-chart-body">
+                <svg class="chart-svg" viewBox="0 0 180 50" preserveAspectRatio="none">
+                  <path fill="none" stroke="var(--cyan)" stroke-width="1.5" d="M0,5 C20,5 40,5 60,5 C80,5 100,5 120,5 C130,10 140,20 150,30 C160,38 170,44 180,48" opacity="0.8"/>
+                  <path fill="var(--cyan)" opacity="0.05" d="M0,5 C20,5 40,5 60,5 C80,5 100,5 120,5 C130,10 140,20 150,30 C160,38 170,44 180,48 L180,50 L0,50 Z"/>
+                </svg>
+              </div>
+            </div>
+            <!-- Grad Norm -->
+            <div class="mini-chart">
+              <div class="mini-chart-header">
+                <span class="mini-chart-title">Grad Norm</span>
+                <span class="mini-chart-val" style="color:var(--amber)">0.42</span>
+              </div>
+              <div class="mini-chart-body">
+                <svg class="chart-svg" viewBox="0 0 180 50" preserveAspectRatio="none">
+                  <path fill="none" stroke="var(--amber)" stroke-width="1.5" d="M0,8 C10,15 20,5 30,20 C40,12 50,25 60,18 C70,22 80,14 90,19 C100,16 110,20 120,17 C130,19 140,21 150,20 C160,18 170,22 180,20" opacity="0.7"/>
+                  <path fill="var(--amber)" opacity="0.05" d="M0,8 C10,15 20,5 30,20 C40,12 50,25 60,18 C70,22 80,14 90,19 C100,16 110,20 120,17 C130,19 140,21 150,20 C160,18 170,22 180,20 L180,50 L0,50 Z"/>
+                </svg>
+              </div>
+            </div>
+            <!-- GPU Util -->
+            <div class="mini-chart">
+              <div class="mini-chart-header">
+                <span class="mini-chart-title">GPU Util</span>
+                <span class="mini-chart-val" style="color:var(--green)">94%</span>
+              </div>
+              <div class="mini-chart-body">
+                <svg class="chart-svg" viewBox="0 0 180 50" preserveAspectRatio="none">
+                  <path fill="none" stroke="var(--green)" stroke-width="1.5" d="M0,6 C10,4 20,7 30,5 C40,6 50,4 60,7 C70,5 80,8 90,6 C100,5 110,7 120,6 C130,4 140,6 150,5 C160,7 170,5 180,6" opacity="0.7"/>
+                  <path fill="var(--green)" opacity="0.06" d="M0,6 C10,4 20,7 30,5 C40,6 50,4 60,7 C70,5 80,8 90,6 C100,5 110,7 120,6 C130,4 140,6 150,5 C160,7 170,5 180,6 L180,50 L0,50 Z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ═══ RUN TABLE ═══ -->
+        <div class="run-table-area">
+          <table class="run-table">
+            <thead>
+              <tr>
+                <th style="width:30px"></th>
+                <th>Run</th>
+                <th>Status</th>
+                <th>Best Loss</th>
+                <th>Eval Acc</th>
+                <th>Steps</th>
+                <th>Loss Curve</th>
+                <th>Duration</th>
+                <th>Config</th>
+                <th>Artifacts</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Run 7 — best -->
+              <tr class="selected">
+                <td><div class="run-check checked">✓</div></td>
+                <td>
+                  <div class="run-name-cell">
+                    <div class="run-color" style="background:var(--chart-1)"></div>
+                    <div>
+                      <div class="run-name">run-7</div>
+                      <div class="run-id">f8a2c1d</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-pill complete"><span class="status-dot-sm"></span> complete</span></td>
+                <td><span class="metric-val best">0.312</span><br><span class="metric-sub">step 1847</span></td>
+                <td><span class="metric-val best">91.4%</span></td>
+                <td><span class="mono sec">2000</span></td>
+                <td>
+                  <div class="sparkline-cell">
+                    <svg class="sparkline-svg" viewBox="0 0 60 20">
+                      <path class="sparkline-path" stroke="var(--chart-1)" d="M0,2 C8,4 16,7 24,10 C32,12 40,14 48,16 C54,17 58,17.5 60,18"/>
+                    </svg>
+                    <span class="mono dim" style="font-size:9px">↓ 0.31</span>
+                  </div>
+                </td>
+                <td><span class="duration">2h 14m</span></td>
+                <td>
+                  <div class="config-tags">
+                    <span class="config-tag">lr <span class="cv">1e-4</span></span>
+                    <span class="config-tag">bs <span class="cv">8</span></span>
+                    <span class="config-tag">r <span class="cv">16</span></span>
+                  </div>
+                </td>
+                <td><span class="mono dim" style="font-size:10px">3 ckpt</span></td>
+              </tr>
+
+              <!-- Run 6 -->
+              <tr>
+                <td><div class="run-check"></div></td>
+                <td>
+                  <div class="run-name-cell">
+                    <div class="run-color" style="background:var(--text-tertiary)"></div>
+                    <div>
+                      <div class="run-name">run-6</div>
+                      <div class="run-id">b3e91f0</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-pill complete"><span class="status-dot-sm"></span> complete</span></td>
+                <td><span class="metric-val mid">0.387</span><br><span class="metric-sub">step 1920</span></td>
+                <td><span class="metric-val mid">89.2%</span></td>
+                <td><span class="mono sec">2000</span></td>
+                <td>
+                  <div class="sparkline-cell">
+                    <svg class="sparkline-svg" viewBox="0 0 60 20">
+                      <path class="sparkline-path" stroke="var(--text-tertiary)" d="M0,1 C8,3 16,6 24,9 C32,12 40,14 48,16 C54,17 58,17.8 60,18"/>
+                    </svg>
+                    <span class="mono dim" style="font-size:9px">↓ 0.39</span>
+                  </div>
+                </td>
+                <td><span class="duration">2h 18m</span></td>
+                <td>
+                  <div class="config-tags">
+                    <span class="config-tag">lr <span class="cv">2e-4</span></span>
+                    <span class="config-tag">bs <span class="cv">8</span></span>
+                    <span class="config-tag">r <span class="cv">16</span></span>
+                  </div>
+                </td>
+                <td><span class="mono dim" style="font-size:10px">2 ckpt</span></td>
+              </tr>
+
+              <!-- Run 5 -->
+              <tr class="selected">
+                <td><div class="run-check checked">✓</div></td>
+                <td>
+                  <div class="run-name-cell">
+                    <div class="run-color" style="background:var(--chart-2)"></div>
+                    <div>
+                      <div class="run-name">run-5</div>
+                      <div class="run-id">91d4e7a</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-pill complete"><span class="status-dot-sm"></span> complete</span></td>
+                <td><span class="metric-val mid">0.402</span><br><span class="metric-sub">step 1956</span></td>
+                <td><span class="metric-val mid">88.7%</span></td>
+                <td><span class="mono sec">2000</span></td>
+                <td>
+                  <div class="sparkline-cell">
+                    <svg class="sparkline-svg" viewBox="0 0 60 20">
+                      <path class="sparkline-path" stroke="var(--chart-2)" d="M0,1 C8,3 16,7 24,10 C32,13 40,15 48,17 C54,18 58,18.5 60,19"/>
+                    </svg>
+                    <span class="mono dim" style="font-size:9px">↓ 0.40</span>
+                  </div>
+                </td>
+                <td><span class="duration">2h 21m</span></td>
+                <td>
+                  <div class="config-tags">
+                    <span class="config-tag">lr <span class="cv">3e-4</span></span>
+                    <span class="config-tag">bs <span class="cv">4</span></span>
+                    <span class="config-tag">r <span class="cv">32</span></span>
+                  </div>
+                </td>
+                <td><span class="mono dim" style="font-size:10px">2 ckpt</span></td>
+              </tr>
+
+              <!-- Run 4 — running -->
+              <tr>
+                <td><div class="run-check"></div></td>
+                <td>
+                  <div class="run-name-cell">
+                    <div class="run-color" style="background:var(--blue)"></div>
+                    <div>
+                      <div class="run-name">run-4</div>
+                      <div class="run-id">c7f20b8</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-pill running"><span class="status-dot-sm"></span> running</span></td>
+                <td><span class="metric-val mid">0.614</span><br><span class="metric-sub">step 823</span></td>
+                <td><span class="mono dim">—</span></td>
+                <td><span class="mono sec">823 / 2000</span></td>
+                <td>
+                  <div class="sparkline-cell">
+                    <svg class="sparkline-svg" viewBox="0 0 60 20">
+                      <path class="sparkline-path" stroke="var(--blue)" d="M0,1 C8,4 16,7 20,9 C24,10 26,11 28,11.5" stroke-dasharray="1,2"/>
+                    </svg>
+                    <span class="mono dim" style="font-size:9px">41%</span>
+                  </div>
+                </td>
+                <td><span class="duration" style="color:var(--blue)">57m…</span></td>
+                <td>
+                  <div class="config-tags">
+                    <span class="config-tag">lr <span class="cv">1e-4</span></span>
+                    <span class="config-tag">bs <span class="cv">16</span></span>
+                    <span class="config-tag">r <span class="cv">8</span></span>
+                  </div>
+                </td>
+                <td><span class="mono dim" style="font-size:10px">—</span></td>
+              </tr>
+
+              <!-- Run 3 -->
+              <tr class="selected">
+                <td><div class="run-check checked">✓</div></td>
+                <td>
+                  <div class="run-name-cell">
+                    <div class="run-color" style="background:var(--chart-3)"></div>
+                    <div>
+                      <div class="run-name">run-3</div>
+                      <div class="run-id">e2a48c3</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-pill complete"><span class="status-dot-sm"></span> complete</span></td>
+                <td><span class="metric-val mid">0.428</span><br><span class="metric-sub">step 1890</span></td>
+                <td><span class="metric-val mid">87.1%</span></td>
+                <td><span class="mono sec">2000</span></td>
+                <td>
+                  <div class="sparkline-cell">
+                    <svg class="sparkline-svg" viewBox="0 0 60 20">
+                      <path class="sparkline-path" stroke="var(--chart-3)" d="M0,1 C8,3 16,6 24,9 C32,11 40,14 48,16 C54,17.5 58,18 60,18.5"/>
+                    </svg>
+                    <span class="mono dim" style="font-size:9px">↓ 0.43</span>
+                  </div>
+                </td>
+                <td><span class="duration">2h 08m</span></td>
+                <td>
+                  <div class="config-tags">
+                    <span class="config-tag">lr <span class="cv">5e-5</span></span>
+                    <span class="config-tag">bs <span class="cv">8</span></span>
+                    <span class="config-tag">r <span class="cv">16</span></span>
+                  </div>
+                </td>
+                <td><span class="mono dim" style="font-size:10px">2 ckpt</span></td>
+              </tr>
+
+              <!-- Run 2 -->
+              <tr>
+                <td><div class="run-check"></div></td>
+                <td>
+                  <div class="run-name-cell">
+                    <div class="run-color" style="background:var(--text-dim)"></div>
+                    <div>
+                      <div class="run-name">run-2</div>
+                      <div class="run-id">a9d17f6</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-pill complete"><span class="status-dot-sm"></span> complete</span></td>
+                <td><span class="metric-val mid">0.511</span><br><span class="metric-sub">step 1780</span></td>
+                <td><span class="metric-val mid">84.3%</span></td>
+                <td><span class="mono sec">2000</span></td>
+                <td>
+                  <div class="sparkline-cell">
+                    <svg class="sparkline-svg" viewBox="0 0 60 20">
+                      <path class="sparkline-path" stroke="var(--text-dim)" d="M0,1 C8,3 16,5 24,8 C32,10 40,13 48,15 C54,16 58,16.5 60,17"/>
+                    </svg>
+                    <span class="mono dim" style="font-size:9px">↓ 0.51</span>
+                  </div>
+                </td>
+                <td><span class="duration">1h 52m</span></td>
+                <td>
+                  <div class="config-tags">
+                    <span class="config-tag">lr <span class="cv">5e-4</span></span>
+                    <span class="config-tag">bs <span class="cv">4</span></span>
+                    <span class="config-tag">r <span class="cv">16</span></span>
+                  </div>
+                </td>
+                <td><span class="mono dim" style="font-size:10px">1 ckpt</span></td>
+              </tr>
+
+              <!-- Run 1 — failed -->
+              <tr>
+                <td><div class="run-check checked" style="border-color:var(--chart-4);background:var(--chart-4)">✓</div></td>
+                <td>
+                  <div class="run-name-cell">
+                    <div class="run-color" style="background:var(--chart-4)"></div>
+                    <div>
+                      <div class="run-name">run-1</div>
+                      <div class="run-id">d4c38e1</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-pill failed"><span class="status-dot-sm"></span> OOM</span></td>
+                <td><span class="metric-val bad">1.247</span><br><span class="metric-sub">step 312</span></td>
+                <td><span class="mono dim">—</span></td>
+                <td><span class="mono" style="color:var(--red);font-size:11px">312 / 2000</span></td>
+                <td>
+                  <div class="sparkline-cell">
+                    <svg class="sparkline-svg" viewBox="0 0 60 20">
+                      <path class="sparkline-path" stroke="var(--red)" d="M0,2 C4,3 8,4 12,5 C16,5.5 18,6 19,6" opacity="0.6"/>
+                      <line x1="19" y1="2" x2="19" y2="14" stroke="var(--red)" stroke-width="0.8" stroke-dasharray="1,1"/>
+                    </svg>
+                    <span class="mono" style="font-size:9px;color:var(--red)">✗</span>
+                  </div>
+                </td>
+                <td><span class="duration" style="color:var(--red)">18m</span></td>
+                <td>
+                  <div class="config-tags">
+                    <span class="config-tag" style="border:1px solid var(--red-dim)">lr <span style="color:var(--red)">1e-3</span></span>
+                    <span class="config-tag">bs <span class="cv">32</span></span>
+                    <span class="config-tag">r <span class="cv">64</span></span>
+                  </div>
+                </td>
+                <td><span class="mono dim" style="font-size:10px">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div><!-- /content-split -->
+    </div><!-- /main -->
+  </div><!-- /layout -->
+
+  <!-- ═══ STATUSBAR ═══ -->
+  <div class="statusbar">
+    <span>llama-finetune · 7 runs · 3 selected for comparison</span>
+    <span class="sep"></span>
+    <span>best: <span style="color:var(--green)">0.312</span> (run-7 · f8a2c1d)</span>
+    <span class="sep"></span>
+    <span>Parquet: ~/.dgxmode/experiments/llama-finetune/runs/*/metrics.parquet</span>
+    <span class="sep"></span>
+    <span>DuckDB query: 4.2ms</span>
+    <span style="margin-left:auto">experiment-logger v0.1.0 · dgxmode.com</span>
+  </div>
+
+</div>
+
+</body>
+</html>

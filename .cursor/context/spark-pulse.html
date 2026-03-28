@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spark Pulse — DGX Spark System Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #09090b;
+    --bg-surface: #0f0f12;
+    --bg-elevated: #161619;
+    --bg-hover: #1c1c21;
+    --bg-active: #24242b;
+    --border: #222230;
+    --border-subtle: #1a1a24;
+    --text-primary: #e8e6e3;
+    --text-secondary: #8b8993;
+    --text-tertiary: #5a5868;
+    --text-dim: #3a3848;
+    --green: #76b900;
+    --green-dim: #76b90020;
+    --green-bright: #8dd100;
+    --amber: #f59e0b;
+    --amber-dim: #f59e0b18;
+    --red: #ef4444;
+    --red-dim: #ef444418;
+    --blue: #60a5fa;
+    --blue-dim: #60a5fa18;
+    --purple: #a78bfa;
+    --purple-dim: #a78bfa18;
+    --cyan: #22d3ee;
+    --cyan-dim: #22d3ee18;
+    --rose: #fb7185;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Instrument Sans', -apple-system, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  .window { height:100vh; display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+
+  /* ─── TITLEBAR ─── */
+  .titlebar {
+    height: 48px; background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0;
+  }
+  .traffic-lights { display:flex; gap:8px; margin-right:8px; }
+  .traffic-lights span { width:12px; height:12px; border-radius:50%; }
+  .tl-close { background:#ff5f57; } .tl-min { background:#febc2e; } .tl-max { background:#28c840; }
+  .titlebar-logo { display:flex; align-items:center; gap:8px; font-weight:700; font-size:13px; color:var(--text-secondary); }
+  .titlebar-logo .mark { width:20px; height:20px; background:var(--green); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#000; font-weight:800; }
+  .titlebar-nav { display:flex; gap:2px; margin-left:24px; background:var(--bg-elevated); border-radius:var(--radius-sm); padding:2px; border:1px solid var(--border-subtle); }
+  .titlebar-nav button { padding:5px 14px; font-size:12px; font-weight:600; font-family:inherit; background:none; border:none; border-radius:4px; color:var(--text-tertiary); cursor:pointer; transition:all 0.15s; }
+  .titlebar-nav button:hover { color:var(--text-secondary); }
+  .titlebar-nav button.active { background:var(--bg-active); color:var(--text-primary); }
+  .titlebar-right { margin-left:auto; display:flex; align-items:center; gap:14px; }
+  .spark-live-badge { display:flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; background:var(--green-dim); border:1px solid var(--green)22; }
+  .spark-live-badge .dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse-live 2s ease infinite; }
+  @keyframes pulse-live { 0%,100%{box-shadow:0 0 0 0 var(--green);opacity:1;} 50%{box-shadow:0 0 8px 2px var(--green);opacity:0.7;} }
+  .spark-live-badge span { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--green); font-weight:500; }
+
+  /* ─── LAYOUT ─── */
+  .layout { display:flex; flex:1; overflow:hidden; flex-direction:column; }
+
+  /* ─── TOP GAUGES STRIP ─── */
+  .gauges-strip {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .gauge-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
+  }
+  .gauge-card::after {
+    content: ''; position: absolute;
+    bottom: 0; left: 0; right: 0; height: 2px;
+  }
+  .gauge-label {
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-dim); margin-bottom: 6px;
+  }
+  .gauge-value-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .gauge-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .gauge-unit {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--text-dim); font-weight: 500;
+  }
+  .gauge-bar {
+    height: 4px; background: var(--bg-active);
+    border-radius: 2px; margin-top: 8px; overflow: hidden;
+  }
+  .gauge-bar-fill { height:100%; border-radius:2px; transition: width 0.8s cubic-bezier(0.16,1,0.3,1); }
+  .gauge-spark {
+    display: flex; align-items: flex-end; gap: 1px;
+    height: 24px; margin-top: 6px;
+  }
+  .gauge-spark .b {
+    width: 3px; border-radius: 1px 1px 0 0;
+    transition: height 0.3s;
+  }
+
+  /* ─── MAIN SPLIT ─── */
+  .main-split { display:flex; flex:1; overflow:hidden; }
+
+  /* ─── LEFT: TIMELINE CHARTS ─── */
+  .timeline-panel {
+    flex: 1;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .timeline-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+  .timeline-header h3 {
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+  }
+  .timeline-header .time-range {
+    margin-left: auto;
+    display: flex; gap: 2px;
+  }
+  .time-btn {
+    padding: 3px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 600; font-family:'JetBrains Mono',monospace;
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    color: var(--text-dim); cursor: pointer;
+  }
+  .time-btn.active { background: var(--bg-active); color: var(--text-secondary); }
+
+  .timeline-charts {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .chart-row {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    height: 110px;
+    display: flex; flex-direction: column;
+    flex-shrink: 0;
+  }
+  .chart-row-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .chart-row-title { font-size: 10.5px; font-weight: 600; color: var(--text-tertiary); }
+  .chart-row-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 700;
+  }
+  .chart-row-body { flex:1; position:relative; }
+  .chart-svg { width:100%; height:100%; }
+  .area-fill { opacity: 0.08; }
+  .area-line { fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .grid-h { stroke: var(--border-subtle); stroke-width: 0.5; stroke-dasharray: 2,4; }
+
+  /* ─── RIGHT: PROCESS TABLE + KERNEL TIMELINE ─── */
+  .right-panel {
+    width: 480px;
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  /* Process table */
+  .process-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg-surface);
+    flex-shrink: 0;
+  }
+  .process-header h3 {
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+  }
+  .process-count {
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    color:var(--text-dim); padding:2px 6px; background:var(--bg-active);
+    border-radius:8px;
+  }
+
+  .process-table-area {
+    flex: 1; overflow-y: auto;
+  }
+  .proc-table { width:100%; border-collapse:collapse; }
+  .proc-table thead th {
+    position: sticky; top: 0;
+    background: var(--bg-surface);
+    padding: 8px 10px;
+    font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-dim); text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .proc-table tbody tr {
+    transition: background 0.1s;
+    animation: row-in 0.2s ease both;
+  }
+  .proc-table tbody tr:hover { background: var(--bg-elevated); }
+  .proc-table td {
+    padding: 8px 10px;
+    font-size: 11.5px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+  }
+  @keyframes row-in { from { opacity:0; } to { opacity:1; } }
+  .proc-table tbody tr:nth-child(1) { animation-delay:0.02s; }
+  .proc-table tbody tr:nth-child(2) { animation-delay:0.04s; }
+  .proc-table tbody tr:nth-child(3) { animation-delay:0.06s; }
+  .proc-table tbody tr:nth-child(4) { animation-delay:0.08s; }
+  .proc-table tbody tr:nth-child(5) { animation-delay:0.10s; }
+
+  .proc-name { font-weight: 600; color: var(--text-primary); }
+  .proc-pid { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-dim); }
+  .proc-bar {
+    width: 60px; height: 4px; background: var(--bg-active);
+    border-radius: 2px; overflow: hidden; display: inline-block;
+    vertical-align: middle; margin-right: 6px;
+  }
+  .proc-bar-fill { height: 100%; border-radius: 2px; }
+  .proc-metric {
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    color: var(--text-secondary);
+  }
+
+  /* ─── KERNEL TIMELINE (bottom of right panel) ─── */
+  .kernel-section {
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .kernel-header {
+    padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .kernel-header h3 {
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+  }
+  .kernel-header .kh-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    padding: 2px 6px; border-radius: 4px;
+    background: var(--blue-dim); color: var(--blue);
+    font-weight: 600;
+  }
+  .kernel-timeline {
+    padding: 10px 14px;
+    height: 200px;
+    overflow-y: auto;
+    background: var(--bg-base);
+  }
+
+  /* Kernel lane */
+  .kernel-lane {
+    display: flex; align-items: center;
+    height: 26px; margin-bottom: 2px;
+  }
+  .kernel-lane-label {
+    width: 80px; flex-shrink: 0;
+    font-family:'JetBrains Mono',monospace;
+    font-size: 9px; color: var(--text-dim);
+    text-align: right; padding-right: 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .kernel-lane-track {
+    flex: 1; height: 16px;
+    position: relative;
+    background: var(--bg-elevated);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .kernel-block {
+    position: absolute; height: 12px; top: 2px;
+    border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-family:'JetBrains Mono',monospace;
+    font-size: 7px; color: rgba(255,255,255,0.7);
+    overflow: hidden; white-space: nowrap;
+    min-width: 4px;
+    cursor: pointer;
+    transition: filter 0.12s;
+  }
+  .kernel-block:hover { filter: brightness(1.3); }
+  .kb-compute { background: var(--green)88; border: 1px solid var(--green)44; }
+  .kb-memcpy { background: var(--blue)88; border: 1px solid var(--blue)44; }
+  .kb-attention { background: var(--amber)88; border: 1px solid var(--amber)44; }
+  .kb-nccl { background: var(--purple)88; border: 1px solid var(--purple)44; }
+  .kb-idle { background: var(--bg-active); border: 1px solid var(--border); }
+
+  .kernel-legend {
+    display: flex; gap: 12px; padding: 6px 14px 10px;
+    background: var(--bg-base);
+    border-top: 1px solid var(--border-subtle);
+  }
+  .kl-item {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 9.5px; color: var(--text-dim); font-weight: 500;
+  }
+  .kl-dot { width:8px; height:4px; border-radius:1px; }
+
+  /* ─── STATUSBAR ─── */
+  .statusbar {
+    height: 26px; background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 14px; gap: 14px;
+    font-family:'JetBrains Mono',monospace;
+    font-size: 9.5px; color: var(--text-dim); flex-shrink: 0;
+  }
+  .statusbar .sep { width:1px; height:10px; background:var(--border); }
+
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<div class="window">
+
+  <!-- ═══ TITLEBAR ═══ -->
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <span class="tl-close"></span><span class="tl-min"></span><span class="tl-max"></span>
+    </div>
+    <div class="titlebar-logo">
+      <div class="mark">θ</div>
+      Spark Pulse
+    </div>
+    <div class="titlebar-nav">
+      <button class="active">Monitor</button>
+      <button>Profiler</button>
+      <button>Memory</button>
+      <button>Bandwidth</button>
+      <button>Thermals</button>
+    </div>
+    <div class="titlebar-right">
+      <div class="spark-live-badge">
+        <div class="dot"></div>
+        <span>spark-a1b2.local · GB10</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- ═══ GAUGE STRIP ═══ -->
+    <div class="gauges-strip">
+
+      <!-- GPU Utilization -->
+      <div class="gauge-card">
+        <div class="gauge-label">GPU Compute</div>
+        <div class="gauge-value-row">
+          <span class="gauge-value" style="color:var(--green)">87<span style="font-size:12px">%</span></span>
+          <span class="gauge-unit">Blackwell SM</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-bar-fill" style="width:87%;background:var(--green)"></div></div>
+        <div class="gauge-spark">
+          <div class="b" style="height:14px;background:var(--green)55"></div>
+          <div class="b" style="height:18px;background:var(--green)66"></div>
+          <div class="b" style="height:12px;background:var(--green)55"></div>
+          <div class="b" style="height:20px;background:var(--green)77"></div>
+          <div class="b" style="height:22px;background:var(--green)88"></div>
+          <div class="b" style="height:19px;background:var(--green)77"></div>
+          <div class="b" style="height:21px;background:var(--green)88"></div>
+          <div class="b" style="height:24px;background:var(--green)99"></div>
+          <div class="b" style="height:20px;background:var(--green)88"></div>
+          <div class="b" style="height:22px;background:var(--green)88"></div>
+        </div>
+      </div>
+
+      <!-- Unified Memory -->
+      <div class="gauge-card">
+        <div class="gauge-label">Unified Memory</div>
+        <div class="gauge-value-row">
+          <span class="gauge-value" style="color:var(--blue)">94.2<span style="font-size:12px">GB</span></span>
+          <span class="gauge-unit">/ 128 GB</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-bar-fill" style="width:73.6%;background:var(--blue)"></div></div>
+        <div class="gauge-spark">
+          <div class="b" style="height:16px;background:var(--blue)55"></div>
+          <div class="b" style="height:16px;background:var(--blue)55"></div>
+          <div class="b" style="height:17px;background:var(--blue)66"></div>
+          <div class="b" style="height:18px;background:var(--blue)66"></div>
+          <div class="b" style="height:18px;background:var(--blue)66"></div>
+          <div class="b" style="height:19px;background:var(--blue)77"></div>
+          <div class="b" style="height:19px;background:var(--blue)77"></div>
+          <div class="b" style="height:20px;background:var(--blue)77"></div>
+          <div class="b" style="height:20px;background:var(--blue)88"></div>
+          <div class="b" style="height:21px;background:var(--blue)88"></div>
+        </div>
+      </div>
+
+      <!-- Memory Bandwidth -->
+      <div class="gauge-card">
+        <div class="gauge-label">Mem Bandwidth</div>
+        <div class="gauge-value-row">
+          <span class="gauge-value" style="color:var(--cyan)">218<span style="font-size:12px">GB/s</span></span>
+          <span class="gauge-unit">/ 273 GB/s</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-bar-fill" style="width:79.9%;background:var(--cyan)"></div></div>
+        <div class="gauge-spark">
+          <div class="b" style="height:18px;background:var(--cyan)66"></div>
+          <div class="b" style="height:20px;background:var(--cyan)77"></div>
+          <div class="b" style="height:16px;background:var(--cyan)55"></div>
+          <div class="b" style="height:22px;background:var(--cyan)88"></div>
+          <div class="b" style="height:19px;background:var(--cyan)66"></div>
+          <div class="b" style="height:21px;background:var(--cyan)88"></div>
+          <div class="b" style="height:17px;background:var(--cyan)55"></div>
+          <div class="b" style="height:23px;background:var(--cyan)88"></div>
+          <div class="b" style="height:20px;background:var(--cyan)77"></div>
+          <div class="b" style="height:21px;background:var(--cyan)77"></div>
+        </div>
+      </div>
+
+      <!-- Temperature -->
+      <div class="gauge-card">
+        <div class="gauge-label">GPU Temperature</div>
+        <div class="gauge-value-row">
+          <span class="gauge-value" style="color:var(--amber)">67<span style="font-size:12px">°C</span></span>
+          <span class="gauge-unit">throttle: 95°C</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-bar-fill" style="width:70.5%;background:linear-gradient(90deg,var(--green),var(--amber))"></div></div>
+        <div class="gauge-spark">
+          <div class="b" style="height:12px;background:var(--green)55"></div>
+          <div class="b" style="height:13px;background:var(--green)55"></div>
+          <div class="b" style="height:14px;background:var(--green)66"></div>
+          <div class="b" style="height:15px;background:var(--amber)55"></div>
+          <div class="b" style="height:16px;background:var(--amber)55"></div>
+          <div class="b" style="height:16px;background:var(--amber)55"></div>
+          <div class="b" style="height:17px;background:var(--amber)66"></div>
+          <div class="b" style="height:17px;background:var(--amber)66"></div>
+          <div class="b" style="height:18px;background:var(--amber)66"></div>
+          <div class="b" style="height:18px;background:var(--amber)77"></div>
+        </div>
+      </div>
+
+      <!-- Power -->
+      <div class="gauge-card">
+        <div class="gauge-label">Power Draw</div>
+        <div class="gauge-value-row">
+          <span class="gauge-value" style="color:var(--text-primary)">89<span style="font-size:12px">W</span></span>
+          <span class="gauge-unit">TDP: 120W</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-bar-fill" style="width:74.2%;background:var(--text-secondary)"></div></div>
+        <div class="gauge-spark">
+          <div class="b" style="height:10px;background:var(--text-dim)"></div>
+          <div class="b" style="height:14px;background:var(--text-dim)"></div>
+          <div class="b" style="height:16px;background:var(--text-tertiary)"></div>
+          <div class="b" style="height:18px;background:var(--text-tertiary)"></div>
+          <div class="b" style="height:17px;background:var(--text-tertiary)"></div>
+          <div class="b" style="height:19px;background:var(--text-tertiary)"></div>
+          <div class="b" style="height:20px;background:var(--text-secondary)44"></div>
+          <div class="b" style="height:20px;background:var(--text-secondary)44"></div>
+          <div class="b" style="height:21px;background:var(--text-secondary)55"></div>
+          <div class="b" style="height:19px;background:var(--text-secondary)44"></div>
+        </div>
+      </div>
+
+      <!-- Tensor Core / FP4 -->
+      <div class="gauge-card">
+        <div class="gauge-label">Tensor Core · FP4</div>
+        <div class="gauge-value-row">
+          <span class="gauge-value" style="color:var(--green-bright)">812<span style="font-size:12px">TOPS</span></span>
+          <span class="gauge-unit">/ 1000 TOPS</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-bar-fill" style="width:81.2%;background:var(--green-bright)"></div></div>
+        <div class="gauge-spark">
+          <div class="b" style="height:0px;background:var(--green-bright)44"></div>
+          <div class="b" style="height:0px;background:var(--green-bright)44"></div>
+          <div class="b" style="height:18px;background:var(--green-bright)66"></div>
+          <div class="b" style="height:20px;background:var(--green-bright)77"></div>
+          <div class="b" style="height:22px;background:var(--green-bright)88"></div>
+          <div class="b" style="height:21px;background:var(--green-bright)88"></div>
+          <div class="b" style="height:23px;background:var(--green-bright)99"></div>
+          <div class="b" style="height:22px;background:var(--green-bright)88"></div>
+          <div class="b" style="height:21px;background:var(--green-bright)88"></div>
+          <div class="b" style="height:20px;background:var(--green-bright)88"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ MAIN SPLIT ═══ -->
+    <div class="main-split">
+
+      <!-- LEFT: TIMELINE CHARTS -->
+      <div class="timeline-panel">
+        <div class="timeline-header">
+          <h3>System Timeline</h3>
+          <div class="time-range">
+            <button class="time-btn">5s</button>
+            <button class="time-btn active">30s</button>
+            <button class="time-btn">2m</button>
+            <button class="time-btn">10m</button>
+            <button class="time-btn">1h</button>
+          </div>
+        </div>
+        <div class="timeline-charts">
+
+          <!-- GPU Utilization Timeline -->
+          <div class="chart-row">
+            <div class="chart-row-header">
+              <span class="chart-row-title">GPU Compute Utilization</span>
+              <span class="chart-row-value" style="color:var(--green)">87%</span>
+            </div>
+            <div class="chart-row-body">
+              <svg class="chart-svg" viewBox="0 0 600 60" preserveAspectRatio="none">
+                <line class="grid-h" x1="0" y1="15" x2="600" y2="15"/>
+                <line class="grid-h" x1="0" y1="30" x2="600" y2="30"/>
+                <line class="grid-h" x1="0" y1="45" x2="600" y2="45"/>
+                <path class="area-fill" fill="var(--green)" d="M0,55 C20,52 40,48 60,42 C80,38 100,30 120,24 C140,20 160,22 180,18 C200,14 220,12 240,10 C260,8 280,10 300,12 C320,8 340,6 360,10 C380,8 400,6 420,8 C440,10 460,8 480,6 C500,8 520,10 540,8 C560,6 580,8 600,8 L600,60 L0,60 Z"/>
+                <path class="area-line" stroke="var(--green)" d="M0,55 C20,52 40,48 60,42 C80,38 100,30 120,24 C140,20 160,22 180,18 C200,14 220,12 240,10 C260,8 280,10 300,12 C320,8 340,6 360,10 C380,8 400,6 420,8 C440,10 460,8 480,6 C500,8 520,10 540,8 C560,6 580,8 600,8"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Memory Usage Timeline -->
+          <div class="chart-row">
+            <div class="chart-row-header">
+              <span class="chart-row-title">Unified Memory Usage</span>
+              <span class="chart-row-value" style="color:var(--blue)">94.2 / 128 GB</span>
+            </div>
+            <div class="chart-row-body">
+              <svg class="chart-svg" viewBox="0 0 600 60" preserveAspectRatio="none">
+                <line class="grid-h" x1="0" y1="15" x2="600" y2="15"/>
+                <line class="grid-h" x1="0" y1="30" x2="600" y2="30"/>
+                <line class="grid-h" x1="0" y1="45" x2="600" y2="45"/>
+                <!-- Model load ramp -->
+                <path class="area-fill" fill="var(--blue)" d="M0,55 C40,55 80,55 100,55 C120,50 140,38 160,28 C180,22 200,20 220,18 C240,17 260,16 280,16 C300,16 320,16 340,16 C360,16 380,16 400,16 C420,16 440,16 460,16 C480,16 500,16 520,16 C540,16 560,16 600,16 L600,60 L0,60 Z"/>
+                <path class="area-line" stroke="var(--blue)" d="M0,55 C40,55 80,55 100,55 C120,50 140,38 160,28 C180,22 200,20 220,18 C240,17 260,16 280,16 C300,16 320,16 340,16 C360,16 380,16 400,16 C420,16 440,16 460,16 C480,16 500,16 520,16 C540,16 560,16 600,16"/>
+                <!-- Annotation -->
+                <line x1="140" y1="0" x2="140" y2="60" stroke="var(--blue)" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.4"/>
+                <text x="144" y="8" font-family="JetBrains Mono" font-size="7" fill="var(--blue)" opacity="0.6">model load</text>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Memory Bandwidth Timeline -->
+          <div class="chart-row">
+            <div class="chart-row-header">
+              <span class="chart-row-title">Memory Bandwidth (LPDDR5x)</span>
+              <span class="chart-row-value" style="color:var(--cyan)">218 GB/s</span>
+            </div>
+            <div class="chart-row-body">
+              <svg class="chart-svg" viewBox="0 0 600 60" preserveAspectRatio="none">
+                <line class="grid-h" x1="0" y1="15" x2="600" y2="15"/>
+                <line class="grid-h" x1="0" y1="30" x2="600" y2="30"/>
+                <!-- Bandwidth ceiling line -->
+                <line x1="0" y1="4" x2="600" y2="4" stroke="var(--red)" stroke-width="0.5" stroke-dasharray="4,4" opacity="0.3"/>
+                <text x="4" y="3" font-family="JetBrains Mono" font-size="6" fill="var(--red)" opacity="0.4">273 GB/s ceiling</text>
+                <path class="area-fill" fill="var(--cyan)" d="M0,50 C20,48 40,42 60,35 C80,28 100,22 120,18 C140,14 160,16 180,12 C200,10 220,14 240,12 C260,10 280,12 300,14 C320,10 340,8 360,12 C380,10 400,8 420,10 C440,12 460,10 480,8 C500,10 520,12 540,10 C560,12 580,10 600,12 L600,60 L0,60 Z"/>
+                <path class="area-line" stroke="var(--cyan)" d="M0,50 C20,48 40,42 60,35 C80,28 100,22 120,18 C140,14 160,16 180,12 C200,10 220,14 240,12 C260,10 280,12 300,14 C320,10 340,8 360,12 C380,10 400,8 420,10 C440,12 460,10 480,8 C500,10 520,12 540,10 C560,12 580,10 600,12"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Tokens/sec throughput -->
+          <div class="chart-row">
+            <div class="chart-row-header">
+              <span class="chart-row-title">Inference Throughput</span>
+              <span class="chart-row-value" style="color:var(--amber)">308 tok/s</span>
+            </div>
+            <div class="chart-row-body">
+              <svg class="chart-svg" viewBox="0 0 600 60" preserveAspectRatio="none">
+                <line class="grid-h" x1="0" y1="20" x2="600" y2="20"/>
+                <line class="grid-h" x1="0" y1="40" x2="600" y2="40"/>
+                <path class="area-fill" fill="var(--amber)" d="M0,58 C40,58 80,58 120,58 C140,58 160,56 180,38 C200,24 220,20 240,18 C260,16 280,18 300,16 C320,20 340,14 360,18 C380,16 400,20 420,16 C440,18 460,14 480,18 C500,16 520,18 540,14 C560,16 580,18 600,16 L600,60 L0,60 Z"/>
+                <path class="area-line" stroke="var(--amber)" d="M0,58 C40,58 80,58 120,58 C140,58 160,56 180,38 C200,24 220,20 240,18 C260,16 280,18 300,16 C320,20 340,14 360,18 C380,16 400,20 420,16 C440,18 460,14 480,18 C500,16 520,18 540,14 C560,16 580,18 600,16"/>
+                <line x1="170" y1="0" x2="170" y2="60" stroke="var(--amber)" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.4"/>
+                <text x="174" y="8" font-family="JetBrains Mono" font-size="7" fill="var(--amber)" opacity="0.6">server start</text>
+              </svg>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- RIGHT: PROCESSES + KERNELS -->
+      <div class="right-panel">
+
+        <div class="process-header">
+          <h3>GPU Processes</h3>
+          <span class="process-count">5 active</span>
+        </div>
+
+        <div class="process-table-area">
+          <table class="proc-table">
+            <thead>
+              <tr>
+                <th>Process</th>
+                <th>GPU %</th>
+                <th>Memory</th>
+                <th>Tok/s</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="proc-name">sglang.server</div>
+                  <div class="proc-pid">PID 4821 · INTELLECT-3-MoE</div>
+                </td>
+                <td>
+                  <div class="proc-bar"><div class="proc-bar-fill" style="width:72%;background:var(--green)"></div></div>
+                  <span class="proc-metric">72%</span>
+                </td>
+                <td><span class="proc-metric">52.1 GB</span></td>
+                <td><span class="proc-metric" style="color:var(--amber)">308</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="proc-name">python: train.py</div>
+                  <div class="proc-pid">PID 5102 · llama-finetune run-4</div>
+                </td>
+                <td>
+                  <div class="proc-bar"><div class="proc-bar-fill" style="width:12%;background:var(--blue)"></div></div>
+                  <span class="proc-metric">12%</span>
+                </td>
+                <td><span class="proc-metric">38.4 GB</span></td>
+                <td><span class="proc-metric" style="color:var(--text-dim)">—</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="proc-name">cudf.pandas</div>
+                  <div class="proc-pid">PID 5340 · metric query</div>
+                </td>
+                <td>
+                  <div class="proc-bar"><div class="proc-bar-fill" style="width:3%;background:var(--cyan)"></div></div>
+                  <span class="proc-metric">3%</span>
+                </td>
+                <td><span class="proc-metric">2.8 GB</span></td>
+                <td><span class="proc-metric" style="color:var(--text-dim)">—</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="proc-name">jupyter-lab</div>
+                  <div class="proc-pid">PID 3201 · idle</div>
+                </td>
+                <td>
+                  <div class="proc-bar"><div class="proc-bar-fill" style="width:0%;background:var(--text-dim)"></div></div>
+                  <span class="proc-metric">0%</span>
+                </td>
+                <td><span class="proc-metric">0.4 GB</span></td>
+                <td><span class="proc-metric" style="color:var(--text-dim)">—</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="proc-name">DGX Dashboard</div>
+                  <div class="proc-pid">PID 1820 · system</div>
+                </td>
+                <td>
+                  <div class="proc-bar"><div class="proc-bar-fill" style="width:0%;background:var(--text-dim)"></div></div>
+                  <span class="proc-metric">0%</span>
+                </td>
+                <td><span class="proc-metric">0.1 GB</span></td>
+                <td><span class="proc-metric" style="color:var(--text-dim)">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- KERNEL TIMELINE -->
+        <div class="kernel-section">
+          <div class="kernel-header">
+            <h3>CUDA Kernel Timeline</h3>
+            <span class="kh-badge">sglang · INTELLECT-3</span>
+          </div>
+          <div class="kernel-timeline">
+
+            <div class="kernel-lane">
+              <div class="kernel-lane-label">SM Compute</div>
+              <div class="kernel-lane-track">
+                <div class="kernel-block kb-attention" style="left:0%;width:18%">mha_fwd</div>
+                <div class="kernel-block kb-compute" style="left:20%;width:8%">gemm</div>
+                <div class="kernel-block kb-compute" style="left:30%;width:6%">silu</div>
+                <div class="kernel-block kb-attention" style="left:38%;width:16%">mha_fwd</div>
+                <div class="kernel-block kb-compute" style="left:56%;width:8%">gemm</div>
+                <div class="kernel-block kb-compute" style="left:66%;width:5%">rmsnorm</div>
+                <div class="kernel-block kb-attention" style="left:73%;width:14%">mha_fwd</div>
+                <div class="kernel-block kb-compute" style="left:89%;width:8%">gemm</div>
+              </div>
+            </div>
+
+            <div class="kernel-lane">
+              <div class="kernel-lane-label">Tensor Core</div>
+              <div class="kernel-lane-track">
+                <div class="kernel-block kb-attention" style="left:1%;width:16%">fp4_mma</div>
+                <div class="kernel-block kb-compute" style="left:20%;width:7%">fp4_mma</div>
+                <div class="kernel-block kb-attention" style="left:39%;width:14%">fp4_mma</div>
+                <div class="kernel-block kb-compute" style="left:56%;width:7%">fp4_mma</div>
+                <div class="kernel-block kb-attention" style="left:74%;width:12%">fp4_mma</div>
+                <div class="kernel-block kb-compute" style="left:89%;width:7%">fp4_mma</div>
+              </div>
+            </div>
+
+            <div class="kernel-lane">
+              <div class="kernel-lane-label">Memory</div>
+              <div class="kernel-lane-track">
+                <div class="kernel-block kb-memcpy" style="left:0%;width:4%">D2D</div>
+                <div class="kernel-block kb-memcpy" style="left:18%;width:2%">KV$</div>
+                <div class="kernel-block kb-memcpy" style="left:28%;width:2%">D2D</div>
+                <div class="kernel-block kb-memcpy" style="left:36%;width:2%">KV$</div>
+                <div class="kernel-block kb-memcpy" style="left:54%;width:2%">D2D</div>
+                <div class="kernel-block kb-memcpy" style="left:64%;width:2%">KV$</div>
+                <div class="kernel-block kb-memcpy" style="left:71%;width:2%">D2D</div>
+                <div class="kernel-block kb-memcpy" style="left:87%;width:2%">KV$</div>
+              </div>
+            </div>
+
+            <div class="kernel-lane">
+              <div class="kernel-lane-label">Copy Engine</div>
+              <div class="kernel-lane-track">
+                <div class="kernel-block kb-memcpy" style="left:5%;width:3%">H2D</div>
+                <div class="kernel-block kb-memcpy" style="left:52%;width:3%">D2H</div>
+              </div>
+            </div>
+
+            <div class="kernel-lane">
+              <div class="kernel-lane-label">Decode</div>
+              <div class="kernel-lane-track">
+                <div class="kernel-block kb-compute" style="left:10%;width:3%">sample</div>
+                <div class="kernel-block kb-compute" style="left:32%;width:3%">sample</div>
+                <div class="kernel-block kb-compute" style="left:58%;width:3%">sample</div>
+                <div class="kernel-block kb-compute" style="left:78%;width:3%">sample</div>
+                <div class="kernel-block kb-compute" style="left:95%;width:3%">sample</div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="kernel-legend">
+            <span class="kl-item"><span class="kl-dot" style="background:var(--green)88"></span> Compute</span>
+            <span class="kl-item"><span class="kl-dot" style="background:var(--amber)88"></span> Attention</span>
+            <span class="kl-item"><span class="kl-dot" style="background:var(--blue)88"></span> MemCopy</span>
+            <span class="kl-item"><span class="kl-dot" style="background:var(--purple)88"></span> NCCL</span>
+            <span class="kl-item"><span class="kl-dot" style="background:var(--bg-active)"></span> Idle</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ STATUSBAR ═══ -->
+  <div class="statusbar">
+    <span>spark-a1b2.local · GB10 Grace Blackwell · DGX OS 7.4.0</span>
+    <span class="sep"></span>
+    <span>Uptime: 14d 3h 22m</span>
+    <span class="sep"></span>
+    <span>SSD: 1.8 / 4.0 TB · SMART: OK</span>
+    <span class="sep"></span>
+    <span>ConnectX-7: 200 Gbps (QSFP not connected)</span>
+    <span class="sep"></span>
+    <span>Polling: 500ms · nvidia-smi over SSH</span>
+    <span style="margin-left:auto">Spark Pulse v0.1.0</span>
+  </div>
+
+</div>
+
+</body>
+</html>
